@@ -21,6 +21,8 @@ SpoFree is a free, open-source, and ad-free music player with a massive catalogu
 - **Audio Quality Selector** ability to switch between Low, High, Lossless, and Hi-Res audio qualities.
 - **Accent Color** you can select that themes the player, sliders, and active elements.
 - **More features coming soon**
+- **Additional Settings** like compact mode, square avatars, grayscale mode
+- **Support for low-end devices** like disable glow, reduced motion, high performance mode
 
 ## 🌐 Live Versions
 
