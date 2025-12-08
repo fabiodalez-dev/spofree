@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Player } from './components/Player';
 import { Sidebar } from './components/Sidebar';
@@ -8,10 +9,11 @@ import { PlaylistEditModal } from './components/PlaylistEditModal';
 import { SettingsModal, SettingsTab } from './components/SettingsModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { RightSidebar } from './components/RightSidebar';
+import { DownloadManager } from './components/DownloadManager';
 import { ViewState, Track, Album, Artist, Playlist, RecentlyPlayedItem, RepeatMode, AudioQuality } from './types';
 import { 
     searchAll, getStreamUrl, getCurrentApiUrl, 
-    getAlbumTracks, getArtistTopTracks, getPlaylistTracks, getArtistAlbums, downloadTrackBlob 
+    getAlbumTracks, getArtistTopTracks, getPlaylistTracks, getArtistAlbums, downloadTrackBlob, downloadBlobWithProgress 
 } from './services/hifiService';
 import { storageService } from './services/storageService';
 import { ChevronLeft, ChevronRight, Search, Home, Library, Heart, Github, Pencil, Settings, Download, Archive, Loader2, Plus, Disc, Mic2, ListMusic } from 'lucide-react';
@@ -32,7 +34,7 @@ interface HistoryState {
 }
 
 // Custom CSV Icon
-const CsvFileIcon = ({size=24, className=""}) => (
+const CsvFileIcon = ({size=24, className=""}: {size?: number, className?: string}) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
       <path d="M14 2v4a2 2 0 0 0 2 2h4" />
@@ -104,8 +106,11 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
-  const [isDownloadingZip, setIsDownloadingZip] = useState(false);
-  const [zipProgress, setZipProgress] = useState(0);
+  
+  // Download State
+  const [zipDownloadState, setZipDownloadState] = useState<{ name: string, progress: number } | null>(null);
+  const [singleDownloadState, setSingleDownloadState] = useState<{ name: string, progress: number } | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [connectedInstance, setConnectedInstance] = useState(getCurrentApiUrl());
   const [isPlaying, setIsPlaying] = useState(false);
@@ -440,13 +445,12 @@ const App: React.FC = () => {
 
   const handleDownloadZip = async () => {
       if (!detailTracks.length) return;
-      setIsDownloadingZip(true);
-      setZipProgress(0);
+      const folderName = (selectedEntity?.title || 'album').replace(/[^a-z0-9]/gi, '_');
+      setZipDownloadState({ name: folderName, progress: 0 });
 
       (async () => {
         try {
             const zip = new JSZip();
-            const folderName = (selectedEntity?.title || 'album').replace(/[^a-z0-9]/gi, '_');
             const folder = zip.folder(folderName);
   
             for (let i = 0; i < detailTracks.length; i++) {
@@ -462,7 +466,7 @@ const App: React.FC = () => {
                     console.error(`Failed to download ${t.title}`, e);
                     folder?.file(`${i+1}. ${t.title}_ERROR.txt`, "Failed to download");
                 }
-                setZipProgress(Math.round(((i + 1) / detailTracks.length) * 100));
+                setZipDownloadState({ name: folderName, progress: Math.round(((i + 1) / detailTracks.length) * 100) });
             }
   
             const content = await zip.generateAsync({ type: "blob" });
@@ -477,11 +481,35 @@ const App: React.FC = () => {
         } catch (e) {
             setError("Failed to generate ZIP file.");
         } finally {
-            setIsDownloadingZip(false);
+            setZipDownloadState(null);
         }
       })();
   };
   
+  const handleDownloadTrack = async () => {
+    if (!currentTrack) return;
+    setSingleDownloadState({ name: currentTrack.title, progress: 0 });
+    
+    try {
+        const url = await getStreamUrl(currentTrack.id);
+        const blob = await downloadBlobWithProgress(url, (p) => {
+             setSingleDownloadState(prev => prev ? { ...prev, progress: p } : null);
+        });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        const ext = blob.type === 'audio/flac' ? 'flac' : 'm4a';
+        link.download = `${currentTrack.title} - ${currentTrack.artist.name}.${ext}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (e) {
+        setError("Failed to download track.");
+    } finally {
+        setSingleDownloadState(null);
+    }
+  };
+
   const handleSaveQueueAsPlaylist = () => {
       if (queue.length === 0) return;
       const title = `Queue - ${new Date().toLocaleDateString()}`;
@@ -510,6 +538,61 @@ const App: React.FC = () => {
         </div>
      );
   };
+
+  const renderDetailsHeader = (type: string, title: string, subtitle: string, image: string, isSaved: boolean) => (
+    <div className="flex flex-col md:flex-row gap-6 mb-8 items-center md:items-end">
+        <img src={image} className={`w-48 h-48 md:w-56 md:h-56 shadow-2xl ${type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'}`} />
+        <div className="flex flex-col gap-4 text-center md:text-left flex-1">
+            <span className="text-sm font-bold uppercase tracking-wider">{type === 'LIKED_SONGS' ? 'Playlist' : type}</span>
+            <h1 className="text-4xl md:text-6xl font-bold tracking-tight">{title}</h1>
+            <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-[#b3b3b3]">
+                {type !== 'ARTIST' && <span>{subtitle}</span>}
+                {type === 'PLAYLIST' && <span>• {detailTracks.length} songs</span>}
+            </div>
+            <div className="flex items-center justify-center md:justify-start gap-4 mt-2">
+                <button 
+                    onClick={() => detailTracks.length > 0 && playTrack(detailTracks[0], detailTracks)}
+                    className="w-14 h-14 rounded-full bg-[#1db954] hover:scale-105 transition-transform flex items-center justify-center shadow-lg"
+                    style={{ backgroundColor: accentColor }}
+                >
+                    <div className="ml-1 w-0 h-0 border-t-[10px] border-t-transparent border-l-[16px] border-l-black border-b-[10px] border-b-transparent"></div>
+                </button>
+                {type !== 'LIKED_SONGS' && (
+                    <button 
+                        onClick={toggleEntitySave} 
+                        className={`p-2 rounded-full border-2 transition-colors ${isSaved ? 'border-green-500 text-green-500' : 'border-[#b3b3b3] text-[#b3b3b3] hover:border-white hover:text-white'}`}
+                    >
+                        <Heart size={24} fill={isSaved ? "currentColor" : "none"} />
+                    </button>
+                )}
+                {type === 'PLAYLIST' && selectedEntity?.isLocal && (
+                    <button onClick={() => setShowPlaylistEditModal(true)} className="text-[#b3b3b3] hover:text-white p-2">
+                        <Pencil size={24} />
+                    </button>
+                )}
+                {/* Export Actions */}
+                <div className="flex gap-2 ml-2">
+                    <button 
+                        onClick={handleExportCSV} 
+                        disabled={isExporting}
+                        className="p-2 text-[#b3b3b3] hover:text-white disabled:opacity-50"
+                        title="Export as CSV"
+                    >
+                        {isExporting ? <Loader2 className="animate-spin" size={24} /> : <CsvFileIcon size={24} />}
+                    </button>
+                    <button 
+                        onClick={handleDownloadZip}
+                        disabled={!!zipDownloadState}
+                        className="p-2 text-[#b3b3b3] hover:text-white disabled:opacity-50"
+                        title="Download as ZIP"
+                    >
+                        {zipDownloadState ? <Loader2 className="animate-spin" size={24} /> : <Archive size={24} />}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+  );
 
   return (
     <div className="h-screen w-screen flex flex-col md:flex-row overflow-hidden bg-black text-white" style={{ filter: grayscaleMode ? 'grayscale(100%)' : 'none' }}>
@@ -593,6 +676,7 @@ const App: React.FC = () => {
                                 </div>
                             </div>
                         )}
+                        <div className="text-[#b3b3b3] text-sm mt-8">Start searching to populate your home screen.</div>
                     </div>
                 )}
                 
@@ -657,50 +741,44 @@ const App: React.FC = () => {
                         {libraryTab === 'ALBUMS' && (
                             savedAlbums.length > 0 ? (
                                 <MediaGrid title="Saved Albums" items={savedAlbums} type="album" />
-                            ) : <div className="text-[#b3b3b3]">No saved albums.</div>
+                            ) : (
+                                <div className="text-center text-[#b3b3b3] mt-20">
+                                    <Disc size={48} className="mx-auto mb-4 opacity-50" />
+                                    <h3 className="text-xl font-bold mb-2">No saved albums</h3>
+                                    <p>Save albums to your library to see them here.</p>
+                                </div>
+                            )
                         )}
 
-                        {libraryTab === 'ARTISTS' && (
-                            followedArtists.length > 0 ? (
+                         {libraryTab === 'ARTISTS' && (
+                             followedArtists.length > 0 ? (
                                 <MediaGrid title="Followed Artists" items={followedArtists} type="artist" />
-                            ) : <div className="text-[#b3b3b3]">No followed artists.</div>
+                            ) : (
+                                <div className="text-center text-[#b3b3b3] mt-20">
+                                    <Mic2 size={48} className="mx-auto mb-4 opacity-50" />
+                                    <h3 className="text-xl font-bold mb-2">No followed artists</h3>
+                                    <p>Follow artists to see them here.</p>
+                                </div>
+                            )
                         )}
                     </div>
                 )}
 
                 {view === ViewState.SEARCH && (
-                    <>
-                        {!searchInput && searchHistory.length > 0 && (
-                            <div className="mb-8">
-                                <h2 className="text-xl font-bold mb-4">Recent Searches</h2>
-                                <div className="flex flex-wrap gap-2">
-                                    {searchHistory.map((term, i) => (
-                                        <button key={i} onClick={() => handleSearch(undefined, term)} className="px-4 py-2 bg-[#2a2a2a] rounded-full text-sm">{term}</button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                        {(hasSearched || (resultTracks.length > 0 || resultArtists.length > 0)) && !isLoading && (
+                    <div>
+                        {isLoading ? (
+                            <div className="flex justify-center mt-20"><Loader2 className="animate-spin" size={48} /></div>
+                        ) : hasSearched ? (
                             <>
-                            <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-                                {['ALL', 'TRACKS', 'ALBUMS', 'ARTISTS', 'PLAYLISTS'].map(f => (
-                                    <button key={f} 
-                                        onClick={() => {
-                                            const newStack = [...historyStack];
-                                            newStack[historyIndex] = { ...currentState, filter: f as CategoryFilter };
-                                            setHistoryStack(newStack);
-                                        }} 
-                                        className={`px-4 py-1.5 rounded-full text-sm font-medium ${filter === f ? 'bg-white text-black' : 'bg-[#2a2a2a] text-white'}`}>
-                                        {f.charAt(0) + f.slice(1).toLowerCase()}
-                                    </button>
-                                ))}
-                            </div>
-                            <div className="flex flex-col gap-8">
-                                {(filter === 'ALL' || filter === 'TRACKS') && resultTracks.length > 0 && (
-                                    <div>
+                                {resultTracks.length === 0 && resultAlbums.length === 0 && resultArtists.length === 0 && (
+                                    <div className="text-center text-[#b3b3b3] mt-20">No results found for "{searchHistory[0]}"</div>
+                                )}
+                                
+                                {resultTracks.length > 0 && (
+                                    <div className="mb-8">
                                         <h2 className="text-2xl font-bold mb-4">Songs</h2>
                                         <TrackList 
-                                            tracks={resultTracks} 
+                                            tracks={resultTracks.slice(0, 5)} 
                                             onPlay={(t) => playTrack(t, resultTracks)} 
                                             currentTrackId={currentTrack?.id} 
                                             onArtistClick={handleArtistClick}
@@ -711,104 +789,89 @@ const App: React.FC = () => {
                                         />
                                     </div>
                                 )}
-                                {(filter === 'ALL' || filter === 'ALBUMS') && <MediaGrid title="Albums" items={resultAlbums} type="album" />}
-                                {(filter === 'ALL' || filter === 'ARTISTS') && <MediaGrid title="Artists" items={resultArtists} type="artist" />}
-                                {(filter === 'ALL' || filter === 'PLAYLISTS') && <MediaGrid title="Playlists" items={resultPlaylists} type="playlist" />}
-                            </div>
+                                
+                                <MediaGrid title="Albums" items={resultAlbums} type="album" />
+                                <MediaGrid title="Artists" items={resultArtists} type="artist" />
+                                <MediaGrid title="Playlists" items={resultPlaylists} type="playlist" />
                             </>
-                        )}
-                    </>
-                )}
-
-                {([ViewState.ALBUM_DETAILS, ViewState.PLAYLIST_DETAILS, ViewState.LIKED_SONGS].includes(view)) && (
-                    <div>
-                        <div className="flex flex-col md:flex-row gap-6 items-center md:items-end mb-6 text-center md:text-left">
-                            <img src={selectedEntity?.cover || selectedEntity?.picture || selectedEntity?.image} className={`w-32 h-32 md:w-52 md:h-52 shadow-2xl rounded-md`} />
-                            <div className="flex flex-col gap-2 flex-1 items-center md:items-start">
-                                <span className="text-xs font-bold uppercase">{view === ViewState.ALBUM_DETAILS ? 'Album' : 'Playlist'}</span>
-                                <div className="flex flex-col md:flex-row items-center gap-4">
-                                    <h1 className="text-3xl md:text-5xl font-black">{selectedEntity?.title || selectedEntity?.name}</h1>
-                                    
-                                    <div className="flex gap-2">
-                                        {/* Save Button for Albums/Playlists */}
-                                        {view !== ViewState.LIKED_SONGS && (
-                                            <button 
-                                                onClick={toggleEntitySave} 
-                                                className={`p-2 hover:bg-white/10 rounded-full transition-colors ${isEntitySaved() ? 'text-green-500' : 'text-[#b3b3b3] hover:text-white'}`} 
-                                                title={isEntitySaved() ? "Remove from Library" : "Save to Library"}
-                                            >
-                                                <Heart size={24} fill={isEntitySaved() ? "currentColor" : "none"} />
+                        ) : (
+                             // Recent Searches
+                             searchHistory.length > 0 && (
+                                <div>
+                                    <h2 className="text-xl font-bold mb-4">Recent Searches</h2>
+                                    <div className="flex flex-wrap gap-2">
+                                        {searchHistory.map((q, i) => (
+                                            <button key={i} onClick={() => handleSearch(undefined, q)} className="px-4 py-2 bg-[#2a2a2a] hover:bg-[#3e3e3e] rounded-full text-sm transition-colors">
+                                                {q}
                                             </button>
-                                        )}
-
-                                        {view === ViewState.PLAYLIST_DETAILS && selectedEntity?.isLocal && (
-                                            <button onClick={() => setShowPlaylistEditModal(true)} className="text-[#b3b3b3] hover:text-white p-2" title="Edit Playlist"><Pencil size={24}/></button>
-                                        )}
-                                        
-                                        <button onClick={handleExportCSV} disabled={isExporting} className="text-[#b3b3b3] hover:text-white p-2" title="Export to CSV">
-                                            {isExporting ? <span className="text-xs">{exportProgress}%</span> : <CsvFileIcon size={24} />}
-                                        </button>
-
-                                        <button onClick={handleDownloadZip} disabled={isDownloadingZip} className="text-[#b3b3b3] hover:text-white p-2" title="Download as ZIP">
-                                            {isDownloadingZip ? <span className="text-xs text-green-500">{zipProgress}%</span> : <Download size={24}/>}
-                                        </button>
+                                        ))}
                                     </div>
                                 </div>
-                                <p className="text-[#b3b3b3]">{selectedEntity?.artist?.name || selectedEntity?.creator?.name}</p>
-                            </div>
-                        </div>
-                        {isLoading ? <div className="text-center py-10">Loading...</div> : (
-                            <TrackList 
-                                tracks={detailTracks} 
-                                onPlay={(t) => playTrack(t, detailTracks)} 
-                                currentTrackId={currentTrack?.id}
-                                onArtistClick={handleArtistClick}
-                                onAlbumClick={handleAlbumClick}
-                                onAddToPlaylist={setTrackToAdd}
-                                accentColor={accentColor}
-                                compactMode={compactMode}
-                            />
+                             )
                         )}
                     </div>
                 )}
 
-                {view === ViewState.ARTIST_DETAILS && (
+                {(view === ViewState.ALBUM_DETAILS || view === ViewState.PLAYLIST_DETAILS || view === ViewState.LIKED_SONGS) && selectedEntity && (
                     <div>
-                        <div className="flex flex-col md:flex-row gap-6 items-center md:items-end mb-6 text-center md:text-left">
-                            <img src={selectedEntity?.cover || selectedEntity?.picture} className={`w-32 h-32 md:w-52 md:h-52 shadow-2xl ${squareAvatars ? 'rounded-md' : 'rounded-full'}`} />
-                            <div className="flex flex-col gap-2 flex-1 items-center md:items-start">
-                                <span className="text-xs font-bold uppercase">Artist</span>
-                                <div className="flex flex-col md:flex-row items-center gap-4">
-                                    <h1 className="text-3xl md:text-5xl font-black">{selectedEntity?.title || selectedEntity?.name}</h1>
-                                    <button 
-                                        onClick={toggleEntitySave} 
-                                        className={`px-4 py-1.5 rounded-full border border-[#b3b3b3] text-sm font-bold hover:border-white hover:scale-105 transition-all ${isEntitySaved() ? 'bg-white text-black border-white' : 'text-white'}`}
-                                    >
-                                        {isEntitySaved() ? 'FOLLOWING' : 'FOLLOW'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        {isLoading ? <div className="text-center py-10">Loading...</div> : (
-                            <MediaGrid title="Albums" items={detailAlbums} type="album" />
+                        {renderDetailsHeader(
+                            view === ViewState.LIKED_SONGS ? 'LIKED_SONGS' : (view === ViewState.ALBUM_DETAILS ? 'ALBUM' : 'PLAYLIST'),
+                            selectedEntity.title,
+                            selectedEntity.artist?.name || selectedEntity.creator?.name || '',
+                            selectedEntity.cover || selectedEntity.image,
+                            isEntitySaved()
                         )}
+                        <TrackList 
+                            tracks={detailTracks} 
+                            onPlay={(t) => playTrack(t, detailTracks)} 
+                            currentTrackId={currentTrack?.id} 
+                            onArtistClick={handleArtistClick}
+                            onAlbumClick={handleAlbumClick}
+                            onAddToPlaylist={setTrackToAdd}
+                            accentColor={accentColor}
+                            compactMode={compactMode}
+                        />
                     </div>
                 )}
-                
-                <div className="mt-20 text-xs text-[#535353] pb-10">Connected to: <span className="text-green-600">{connectedInstance}</span></div>
+
+                {view === ViewState.ARTIST_DETAILS && selectedEntity && (
+                     <div>
+                        {renderDetailsHeader(
+                            'ARTIST',
+                            selectedEntity.name,
+                            '',
+                            selectedEntity.picture,
+                            isEntitySaved()
+                        )}
+                        <h2 className="text-2xl font-bold mb-4">Popular</h2>
+                        <TrackList 
+                            tracks={detailTracks} 
+                            onPlay={(t) => playTrack(t, detailTracks)} 
+                            currentTrackId={currentTrack?.id} 
+                            onArtistClick={handleArtistClick}
+                            onAlbumClick={handleAlbumClick}
+                            onAddToPlaylist={setTrackToAdd}
+                            accentColor={accentColor}
+                            compactMode={compactMode}
+                        />
+                        <div className="mt-8">
+                            <MediaGrid title="Albums" items={detailAlbums} type="album" />
+                        </div>
+                    </div>
+                )}
             </div>
             </div>
 
-            {/* Right Sidebar Panel */}
+            {/* Right Sidebar */}
             {rightSidebarMode && (
-                <div className="w-80 flex-shrink-0 hidden lg:block z-30 transition-all duration-300">
+                <div className="w-[300px] hidden lg:block border-l border-[#282828] flex-none">
                     <RightSidebar 
                         mode={rightSidebarMode}
                         queue={queue}
                         currentTrack={currentTrack}
                         onPlay={(t) => playTrack(t, queue)}
                         onClose={() => setRightSidebarMode(null)}
-                        onClearQueue={() => { setQueue([]); setOriginalQueue([]); }}
+                        onClearQueue={() => setQueue(currentTrack ? [currentTrack] : [])}
                         onSaveQueue={handleSaveQueueAsPlaylist}
                         accentColor={accentColor}
                     />
@@ -817,25 +880,9 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {isDownloadingZip && (
-        <div className="fixed bottom-20 right-4 z-[60] bg-[#282828] p-4 rounded-lg shadow-xl border border-[#333] flex items-center gap-4 w-80 animate-slide-up">
-            <div className="relative w-12 h-12 flex-shrink-0 flex items-center justify-center">
-                 <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                    <path className="text-gray-600" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
-                    <path className="text-green-500 transition-all duration-300 ease-linear" strokeDasharray={`${zipProgress}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="4" />
-                 </svg>
-                 <span className="absolute text-xs font-bold">{zipProgress}%</span>
-            </div>
-            <div className="flex flex-col">
-                <span className="font-bold text-sm">Downloading...</span>
-                <span className="text-xs text-[#b3b3b3]">Generating ZIP file</span>
-            </div>
-        </div>
-      )}
-
       <Player 
-        currentTrack={currentTrack} 
-        isPlaying={isPlaying} 
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
         onPlayPause={() => setIsPlaying(!isPlaying)}
         onNext={handleNext}
         onPrev={handlePrev}
@@ -843,11 +890,9 @@ const App: React.FC = () => {
         repeatMode={repeatMode}
         onToggleShuffle={toggleShuffle}
         onToggleRepeat={toggleRepeat}
-        
         onArtistClick={handleArtistClick}
         onQualityClick={() => { setSettingsStartTab('QUALITY'); setShowSettingsModal(true); }}
-        
-        // Settings Props
+        onDownload={handleDownloadTrack}
         accentColor={accentColor}
         showVisualizer={showVisualizer}
         showStats={showStats}
@@ -855,73 +900,37 @@ const App: React.FC = () => {
         setSleepTimer={setSleepTimer}
         highPerformanceMode={highPerformanceMode}
         disableGlow={disableGlow}
-
-        // Sidebar Toggles
         showQueue={rightSidebarMode === 'QUEUE'}
-        toggleQueue={() => setRightSidebarMode(m => m === 'QUEUE' ? null : 'QUEUE')}
+        toggleQueue={() => setRightSidebarMode(mode => mode === 'QUEUE' ? null : 'QUEUE')}
         showLyrics={rightSidebarMode === 'LYRICS'}
-        toggleLyrics={() => setRightSidebarMode(m => m === 'LYRICS' ? null : 'LYRICS')}
-
-        // Queue Data
+        toggleLyrics={() => setRightSidebarMode(mode => mode === 'LYRICS' ? null : 'LYRICS')}
         queue={queue}
         onPlayTrack={(t) => playTrack(t, queue)}
       />
-      
-      {showImportModal && <ImportModal onClose={() => setShowImportModal(false)} onImport={(t, tr) => { 
-          const p = storageService.createPlaylist(t); 
-          tr.forEach(x => storageService.addTrackToPlaylist(p.uuid, x)); 
-          refreshLibrary(); 
-      }} />}
-      
-      {showPlaylistEditModal && selectedEntity?.isLocal && (
-          <PlaylistEditModal playlist={selectedEntity} onClose={() => setShowPlaylistEditModal(false)} 
-              onSave={(id, t) => { storageService.renamePlaylist(id, t); refreshLibrary(); 
-                  const newStack = [...historyStack];
-                  newStack[historyIndex] = { ...currentState, entity: {...selectedEntity, title: t} };
-                  setHistoryStack(newStack);
-              }}
-              onDelete={(id) => { storageService.deletePlaylist(id); refreshLibrary(); navigateTo({ view: ViewState.LIBRARY }); }}
-          />
-      )}
 
+      <DownloadManager singleDownload={singleDownloadState} zipDownload={zipDownloadState} />
+
+      {showImportModal && <ImportModal onClose={() => setShowImportModal(false)} onImport={(title, tracks) => { const p = storageService.createPlaylist(title); tracks.forEach(t => storageService.addTrackToPlaylist(p.uuid, t)); refreshLibrary(); }} />}
+      {showPlaylistEditModal && selectedEntity && <PlaylistEditModal playlist={selectedEntity} onClose={() => setShowPlaylistEditModal(false)} onSave={(id, title) => { storageService.renamePlaylist(id, title); refreshLibrary(); selectedEntity.title = title; }} onDelete={(id) => { storageService.deletePlaylist(id); refreshLibrary(); navigateTo({ view: ViewState.LIBRARY }); }} />}
       {showSettingsModal && (
         <SettingsModal 
-            onClose={() => setShowSettingsModal(false)}
+            onClose={() => setShowSettingsModal(false)} 
             defaultTab={settingsStartTab}
-            quality={audioQuality}
-            setQuality={(q) => { storageService.setQuality(q); setAudioQuality(q); }}
-            accentColor={accentColor}
-            setAccentColor={(c) => { storageService.setAccentColor(c); setAccentColor(c); }}
-            showVisualizer={showVisualizer}
-            setShowVisualizer={(v) => { storageService.setShowVisualizer(v); setShowVisualizer(v); }}
-            showStats={showStats}
-            setShowStats={(v) => { storageService.setShowStats(v); setShowStats(v); }}
-            sleepTimer={sleepTimer}
-            setSleepTimer={setSleepTimer}
-            compactMode={compactMode}
-            setCompactMode={(v) => { storageService.setCompactMode(v); setCompactMode(v); }}
-            reducedMotion={reducedMotion}
-            setReducedMotion={(v) => { storageService.setReducedMotion(v); setReducedMotion(v); }}
-            grayscaleMode={grayscaleMode}
-            setGrayscaleMode={(v) => { storageService.setGrayscaleMode(v); setGrayscaleMode(v); }}
-            squareAvatars={squareAvatars}
-            setSquareAvatars={(v) => { storageService.setSquareAvatars(v); setSquareAvatars(v); }}
-            highPerformanceMode={highPerformanceMode}
-            setHighPerformanceMode={(v) => { storageService.setHighPerformanceMode(v); setHighPerformanceMode(v); }}
-            disableGlow={disableGlow}
-            setDisableGlow={(v) => { storageService.setDisableGlow(v); setDisableGlow(v); }}
-            updateTitle={updateTitle}
-            setUpdateTitle={(v) => { storageService.setUpdateTitle(v); setUpdateTitle(v); }}
+            quality={audioQuality} setQuality={(q) => { storageService.setQuality(q); setAudioQuality(q); }}
+            accentColor={accentColor} setAccentColor={(c) => { storageService.setAccentColor(c); setAccentColor(c); }}
+            showStats={showStats} setShowStats={(s) => { storageService.setShowStats(s); setShowStats(s); }}
+            compactMode={compactMode} setCompactMode={(s) => { storageService.setCompactMode(s); setCompactMode(s); }}
+            reducedMotion={reducedMotion} setReducedMotion={(s) => { storageService.setReducedMotion(s); setReducedMotion(s); }}
+            grayscaleMode={grayscaleMode} setGrayscaleMode={(s) => { storageService.setGrayscaleMode(s); setGrayscaleMode(s); }}
+            squareAvatars={squareAvatars} setSquareAvatars={(s) => { storageService.setSquareAvatars(s); setSquareAvatars(s); }}
+            sleepTimer={sleepTimer} setSleepTimer={setSleepTimer}
+            highPerformanceMode={highPerformanceMode} setHighPerformanceMode={(s) => { storageService.setHighPerformanceMode(s); setHighPerformanceMode(s); }}
+            disableGlow={disableGlow} setDisableGlow={(s) => { storageService.setDisableGlow(s); setDisableGlow(s); }}
+            updateTitle={updateTitle} setUpdateTitle={(s) => { storageService.setUpdateTitle(s); setUpdateTitle(s); }}
+            showVisualizer={showVisualizer} setShowVisualizer={(s) => { storageService.setShowVisualizer(s); setShowVisualizer(s); }}
         />
       )}
-      
-      {trackToAdd && (
-          <AddToPlaylistModal 
-              track={trackToAdd} 
-              onClose={() => setTrackToAdd(null)} 
-              onCreateNew={() => { setTrackToAdd(null); setShowImportModal(true); }}
-          />
-      )}
+      {trackToAdd && <AddToPlaylistModal track={trackToAdd} onClose={() => setTrackToAdd(null)} onCreateNew={() => setShowImportModal(true)} />}
     </div>
   );
 };
