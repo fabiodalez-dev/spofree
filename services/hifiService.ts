@@ -1,4 +1,5 @@
 
+
 import { API_INSTANCES } from '../constants';
 import { SearchResult, Track, Album, Artist, Playlist, AudioQuality } from '../types';
 import { storageService } from './storageService';
@@ -343,4 +344,34 @@ export const downloadTrackBlob = async (url: string): Promise<Blob> => {
     const response = await fetch(url);
     if (!response.ok) throw new Error("Download failed");
     return await response.blob();
+};
+
+export const downloadBlobWithProgress = async (url: string, onProgress: (percent: number) => void): Promise<Blob> => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Download failed");
+    
+    const contentLength = response.headers.get('content-length');
+    const total = contentLength ? parseInt(contentLength, 10) : 0;
+    let loaded = 0;
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+        // Fallback if no reader
+        const blob = await response.blob();
+        onProgress(100);
+        return blob;
+    }
+
+    const chunks = [];
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        loaded += value.length;
+        if (total) {
+            onProgress(Math.min(Math.round((loaded / total) * 100), 100));
+        }
+    }
+    
+    return new Blob(chunks, { type: response.headers.get('content-type') || 'audio/mpeg' });
 };
