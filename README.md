@@ -1,59 +1,71 @@
-# 🎶 SpoFree
 
-SpoFree is a free, open-source, and ad-free music player with a massive catalogue and a clean interface similar to Spotify. No account, no login, no setup. Just open it and start listening.
+# SpoFreeFy - High Fidelity Music Streaming
 
-## Features
+**SpoFreeFy** is a modern, high-fidelity music streaming client inspired by the aesthetics of Spotify but powered by the lossless audio capabilities of the Tidal-compatible Hifi API.
 
-- **Ad-Free Listening** from Tidal
-- **Lossless Audio** for hifi sound
-- **Huge Catalogue** powered by the full TIDAL library and HiFi APIs
-- **Clean UI** similar to Spotify
-- **Playlist Support** create and import your own Playlists
-- **Local Storage** playlists, liked songs, recently listened saved via IndexDB in your browser
-- **Advanced Search** find tracks, albums, artists, playlists
-- **Search Filters** sort by album, track, artist, or playlist
-- **Export** songs, playlists, albums and liked songs as csv or zip
-- **Sleep Timer** with customizable length
-- **Queue** that you can save as a playlist and customize
-- **Media Session API** for lock screen and control center support
-- **Library Tabs** Organized library with Playlists, Liked Songs, Saved Albums, and Followed Artists.
-- **Import Playlist** via Modal to import playlists via Text (Artist - Title) or CSV file.
-- **Audio Quality Selector** ability to switch between Low, High, Lossless, and Hi-Res audio qualities.
-- **Accent Color** you can select that themes the player, sliders, and active elements.
-- **More features coming soon**
+## 🚀 Features
 
-## 🌐 Live Versions
+### 🎧 Audio & Playback
+- **Lossless Audio**: Supports streaming FLAC (16-bit/44.1kHz) and AAC (320kbps).
+- **Direct Streaming**: Bypasses restrictions by rotating through public Hifi API instances.
+- **Robust Player**: Includes Shuffle, Repeat, Volume Control, and Seek capabilities.
+- **Lyrics Support**: Real-time synchronized lyrics for supported tracks.
+- **Downloads**: Download songs directly to your device as `.flac` files.
 
-| Version        | URL                         | Note                          |
-|----------------|------------------------------|-------------------------------|
-| **Stable**     | https://spo.free.nf  | Recommended version           |
-| **Beta**       | https://spofree-beta.netlify.app | New features, may be buggy |
+### 📚 Library Management
+- **Local Playlists**: Create, rename, and delete playlists stored locally in your browser.
+- **Liked Songs**: Save your favorite tracks to a dedicated "Liked Songs" library.
+- **Import Playlists**: Create playlists by pasting text/CSV lists of songs (e.g., "Song Name - Artist").
+- **Search History**: Keeps track of your recent searches for quick access.
 
-## ⚙️ How It Works
+### 🎨 UI & UX
+- **Spotify-Inspired Design**: Dark mode, clean typography, and familiar layout.
+- **Mobile Responsive**: Fully optimized for mobile with a bottom navigation bar and touch-friendly controls.
+- **Detail Views**: Dedicated pages for Albums, Artists, and Playlists with full track listings.
+- **Search Categorization**: Filter results by Songs, Albums, Artists, or Playlists.
 
-SpoFree acts as a client that fetches lossless audio directly from TIDAL’s catalogue.
+## 🛠️ Technology Stack
 
-How it works:
-1. You search for a song  
-2. SpoFree sends the query to a HiFi API  
-3. The API returns a direct TIDAL lossless stream link  
-4. SpoFree plays the audio instantly
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **Icons**: Lucide React
+- **Backend/API**: Connects to public Hifi API instances (Reverse-engineered Tidal API wrappers).
+- **Storage**: Browser LocalStorage for playlists and history.
 
-The API instances come from open-source HiFi projects that provide public endpoints.
+## 📦 Installation
 
-## 🚀 Deployment
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/redretep/SpoFreeFy.git
+    cd SpoFreeFy
+    ```
 
-You can deploy your own SpoFree instance for free on services like **Netlify** or **Vercel**.  
-Clone the repo, upload, done.
+2.  **Install dependencies**
+    ```bash
+    npm install
+    ```
 
-## 🤝 Contributing and Issues
+3.  **Run the development server**
+    ```bash
+    npm start
+    ```
 
-Contributions are welcome. Feel free to open a Pull Request. Also please submit any bugs you find!
+4.  **Build for production**
+    ```bash
+    npm run build
+    ```
 
-## 🔗 Related Projects
+## 📝 Usage
 
-- https://github.com/uimaxbai/tidal-ui  
-- https://github.com/sachinsenal0x64/hifi  
-- https://github.com/uimaxbai/hifi-api  
-- https://github.com/monochrome-music/monochrome  
-- https://github.com/EduardPrigoana/hifi-instances
+1.  **Search**: Use the search bar to find songs, albums, or artists.
+2.  **Play**: Click on any track or album cover to start playback.
+3.  **Library**: Click the heart icon to save songs, or use the "Import Playlist" button in the sidebar.
+4.  **Lyrics**: Click the microphone icon in the player bar to view lyrics.
+5.  **Download**: Click the download icon in the player bar to save the current track.
+
+## ⚠️ Disclaimer
+
+This project is for **educational purposes only**. It acts as a frontend for public API instances. The developers do not host any copyrighted content. Please support artists by using official streaming services.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

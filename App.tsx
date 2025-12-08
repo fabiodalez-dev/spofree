@@ -72,6 +72,9 @@ const App: React.FC = () => {
 
   const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayedItem[]>([]);
   
+  // Home Recommendations State
+  const [homeSections, setHomeSections] = useState<{ title: string; items: any[]; type: 'ALBUM' | 'PLAYLIST' | 'ARTIST' }[]>([]);
+
   // Search State
   const [searchInput, setSearchInput] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
@@ -153,9 +156,76 @@ const App: React.FC = () => {
       setUpdateTitle(storageService.getUpdateTitle());
   };
 
+  const fetchHomeContent = async () => {
+    const sections: { title: string; items: any[]; type: 'ALBUM' | 'PLAYLIST' | 'ARTIST' }[] = [];
+    const recent = storageService.getRecentlyPlayed();
+    
+    // 1. Personalized Recommendations
+    // Find the most recent Artist interaction
+    const lastArtistItem = recent.find(i => 
+        i.type === 'ARTIST' || 
+        (i.type === 'ALBUM' && (i.data as Album).artist) || 
+        (i.type === 'TRACK' && (i.data as Track).artist)
+    );
+
+    if (lastArtistItem) {
+        let artistId, artistName;
+        if (lastArtistItem.type === 'ARTIST') {
+            artistId = (lastArtistItem.data as Artist).id;
+            artistName = (lastArtistItem.data as Artist).name;
+        } else if (lastArtistItem.type === 'ALBUM') {
+             artistId = (lastArtistItem.data as Album).artist?.id;
+             artistName = (lastArtistItem.data as Album).artist?.name;
+        } else if (lastArtistItem.type === 'TRACK') {
+             artistId = (lastArtistItem.data as Track).artist.id;
+             artistName = (lastArtistItem.data as Track).artist.name;
+        }
+
+        if (artistId && artistName) {
+            try {
+                const albums = await getArtistAlbums(artistId);
+                if (albums.length > 0) {
+                    sections.push({
+                        title: `More from ${artistName}`,
+                        items: albums.slice(0, 5),
+                        type: 'ALBUM'
+                    });
+                }
+            } catch(e) { console.error(e); }
+        }
+    }
+
+    // 2. Default Popular Content
+    try {
+        const [popRes, hitsRes] = await Promise.all([
+            searchAll('Pop'),
+            searchAll('Top Hits')
+        ]);
+
+        if (popRes.playlists.length > 0) {
+            sections.push({
+                title: 'Popular Playlists',
+                items: popRes.playlists.slice(0, 5),
+                type: 'PLAYLIST'
+            });
+        }
+        
+        if (hitsRes.albums.length > 0) {
+            sections.push({
+                title: 'Trending Albums',
+                items: hitsRes.albums.slice(0, 5),
+                type: 'ALBUM'
+            });
+        }
+    } catch (e) { console.error(e); }
+
+    setHomeSections(sections);
+  };
+
   useEffect(() => {
     refreshLibrary();
     updateConnectionStatus();
+    fetchHomeContent();
   }, []);
 
   // Update document title
@@ -522,7 +592,7 @@ const App: React.FC = () => {
   const MediaGrid = ({ title, items, type }: any) => {
      if (!items?.length) return null;
      return (
-        <div className="mb-8">
+        <div className="mb-8 animate-fade-in">
            <h2 className="text-2xl font-bold mb-4">{title}</h2>
            <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {items.map((item: any, idx: number) => (
@@ -676,7 +746,20 @@ const App: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                        <div className="text-[#b3b3b3] text-sm mt-8">Start searching to populate your home screen.</div>
+
+                        {/* Home Recommendations Sections */}
+                        {homeSections.map((section, idx) => (
+                            <MediaGrid 
+                                key={idx}
+                                title={section.title}
+                                items={section.items}
+                                type={section.type.toLowerCase()}
+                            />
+                        ))}
+
+                        {recentlyPlayed.length === 0 && homeSections.length === 0 && (
+                            <div className="text-[#b3b3b3] text-sm mt-8">Loading recommendations...</div>
+                        )}
                     </div>
                 )}
                 
