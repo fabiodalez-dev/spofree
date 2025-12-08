@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { Check, Wifi, Palette, Sliders, Timer, ListCollapse, EyeOff, Square, Monitor, Gauge, Droplets, Type, Keyboard, Activity } from 'lucide-react';
 import { Button } from './Button';
@@ -113,7 +112,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         switch(activeTab) {
             case 'QUALITY':
                 return (
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 animate-slide-up">
                         {qualityOptions.map((opt) => (
                             <div 
                                 key={opt.value} 
@@ -131,7 +130,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 );
             case 'APPEARANCE':
                 return (
-                    <div>
+                    <div className="animate-slide-up">
                         <div className="mb-4 text-sm text-[#b3b3b3]">Choose an accent color for the player UI and visualizations.</div>
                         <div className="grid grid-cols-4 gap-4 mb-8">
                             {themes.map(color => (
@@ -177,7 +176,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 );
             case 'PLAYBACK':
                 return (
-                    <div className="flex flex-col gap-6">
+                    <div className="flex flex-col gap-6 animate-slide-up">
                         {/* Sleep Timer */}
                         <div>
                             <div className="flex items-center gap-2 font-bold mb-3">
@@ -218,7 +217,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 );
             case 'TWEAKS':
                 return (
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 animate-slide-up">
                         <button 
                             onClick={() => setShowShortcuts(true)}
                             className="flex items-center justify-between p-4 rounded-md cursor-pointer hover:bg-white/5 bg-[#2a2a2a] mb-2"
@@ -284,34 +283,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-[#181818] rounded-xl shadow-2xl w-full max-w-2xl h-[80vh] flex overflow-hidden border border-[#282828]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-scale-in">
+            <div className="bg-[#181818] rounded-xl shadow-2xl w-full max-w-2xl h-[90vh] md:h-[80vh] flex flex-col md:flex-row overflow-hidden border border-[#282828]">
                 {/* Sidebar */}
-                <div className="w-1/3 bg-[#121212] border-r border-[#282828] p-4 flex flex-col gap-2">
-                    <h2 className="text-xl font-bold px-4 mb-4">Settings</h2>
+                <div className="w-full md:w-1/3 bg-[#121212] border-b md:border-b-0 md:border-r border-[#282828] p-4 flex md:flex-col gap-2 overflow-x-auto md:overflow-visible flex-shrink-0">
+                    <h2 className="text-xl font-bold px-4 mb-2 md:mb-4 hidden md:block">Settings</h2>
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as SettingsTab)}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${activeTab === tab.id ? 'bg-[#282828] text-white font-bold' : 'text-[#b3b3b3] hover:text-white hover:bg-[#1f1f1f]'}`}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors flex-shrink-0 whitespace-nowrap md:whitespace-normal ${activeTab === tab.id ? 'bg-[#282828] text-white font-bold' : 'text-[#b3b3b3] hover:text-white hover:bg-[#1f1f1f]'}`}
                         >
                             <tab.icon size={20} />
                             <span>{tab.label}</span>
                         </button>
                     ))}
-                    <div className="mt-auto text-xs text-[#535353] px-4 pb-2">
-                        SpoFree v2.1
+                    <div className="mt-auto text-xs text-[#535353] px-4 pb-2 hidden md:block">
+                        SpoFree v2.2
                         <br/>
                         Made by redretep
                     </div>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 flex flex-col">
-                    <div className="flex justify-end p-4">
+                <div className="flex-1 flex flex-col min-h-0">
+                    <div className="flex justify-between md:justify-end items-center p-4">
+                         <span className="md:hidden text-xs text-[#535353] font-mono">v2.2</span>
                         <button onClick={onClose} className="p-2 hover:bg-[#282828] rounded-full transition-colors"><Check /></button>
                     </div>
-                    <div className="flex-1 overflow-y-auto p-8 pt-0">
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-0">
                         {renderContent()}
                     </div>
                 </div>

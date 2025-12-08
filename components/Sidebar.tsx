@@ -65,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="bg-[#b3b3b3] p-1 rounded-sm bg-opacity-20">
             <PlusSquare size={20} className="text-[#b3b3b3]" />
           </div>
-          <span className="font-bold text-sm">Import Playlist</span>
+          <span className="font-bold text-sm">Create Playlist</span>
         </button>
         <button 
             onClick={onLikedSongsClick}
@@ -106,8 +106,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
         
         <div className="flex items-center justify-center gap-2 text-xs text-[#b3b3b3] pt-2">
-          <Globe size={14} />
-          <span>Hifi API Connected</span>
+            <Globe size={14} />
+            <span>Hifi API Connected</span>
         </div>
       </div>
     </div>
