@@ -223,12 +223,10 @@ export const storageService = {
 
   savePlaylist: (playlist: Playlist): boolean => {
       const data = getStorage();
-      // Check if already exists by UUID
       const exists = data.playlists.some(p => p.uuid === playlist.uuid);
       if (exists) {
           data.playlists = data.playlists.filter(p => p.uuid !== playlist.uuid);
       } else {
-          // If saving a public playlist, ensure we keep track of it
           data.playlists.push({ ...playlist, isLocal: playlist.isLocal ?? false });
       }
       setStorage(data);
@@ -244,6 +242,7 @@ export const storageService = {
     const newPlaylist: Playlist = {
       uuid: crypto.randomUUID(),
       title,
+      description: '',
       image: 'https://via.placeholder.com/300?text=' + encodeURIComponent(title),
       creator: { name: 'You' },
       isLocal: true,
@@ -254,7 +253,32 @@ export const storageService = {
     return newPlaylist;
   },
 
+  updatePlaylist: (uuid: string, updates: { title?: string, description?: string, image?: string }) => {
+    const data = getStorage();
+    const playlist = data.playlists.find(p => p.uuid === uuid);
+    if (playlist) {
+      if (updates.title !== undefined) playlist.title = updates.title;
+      if (updates.description !== undefined) playlist.description = updates.description;
+      if (updates.image !== undefined) playlist.image = updates.image;
+      setStorage(data);
+    }
+  },
+
+  updatePlaylistTracks: (uuid: string, tracks: Track[]) => {
+      const data = getStorage();
+      const playlist = data.playlists.find(p => p.uuid === uuid);
+      if (playlist) {
+          playlist.tracks = tracks;
+          // Update cover if needed and not custom
+          if (playlist.image.includes('placeholder') && tracks.length > 0) {
+               playlist.image = tracks[0].album.cover;
+          }
+          setStorage(data);
+      }
+  },
+
   renamePlaylist: (uuid: string, newTitle: string) => {
+    // Deprecated wrapper, use updatePlaylist
     const data = getStorage();
     const playlist = data.playlists.find(p => p.uuid === uuid);
     if (playlist) {
@@ -274,10 +298,8 @@ export const storageService = {
     const playlist = data.playlists.find(p => p.uuid === playlistUuid);
     if (playlist) {
       if (!playlist.tracks) playlist.tracks = [];
-      // Avoid duplicates
       if (!playlist.tracks.some(t => t.id === track.id)) {
         playlist.tracks.push(track);
-        // Update cover image to first track's cover if generic
         if (playlist.image.includes('placeholder') && track.album.cover) {
             playlist.image = track.album.cover;
         }
@@ -305,7 +327,6 @@ export const storageService = {
 
   addToRecentlyPlayed: (item: RecentlyPlayedItem) => {
       const data = getStorage();
-      // Remove duplicates based on ID
       const filtered = data.recentlyPlayed.filter(i => {
           const existingId = (i.data as any).id || (i.data as any).uuid;
           const newId = (item.data as any).id || (item.data as any).uuid;
