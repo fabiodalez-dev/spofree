@@ -16,12 +16,13 @@ import {
     getAlbumTracks, getArtistTopTracks, getPlaylistTracks, getArtistAlbums, downloadTrackBlob, downloadBlobWithProgress 
 } from './services/hifiService';
 import { storageService } from './services/storageService';
-import { ChevronLeft, ChevronRight, Search, Home, Library, Heart, Github, Pencil, Settings, Download, Archive, Loader2, Plus, Disc, Mic2, ListMusic } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Home, Library, Heart, Github, Pencil, Settings, Download, Archive, Loader2, Plus, Disc, Mic2, ListMusic, ArrowDownUp } from 'lucide-react';
 import { Button } from './components/Button';
 import JSZip from 'jszip';
 
 type CategoryFilter = 'ALL' | 'TRACKS' | 'ALBUMS' | 'ARTISTS' | 'PLAYLISTS';
 type LibraryTab = 'PLAYLISTS' | 'LIKED_SONGS' | 'ALBUMS' | 'ARTISTS';
+type SortOption = 'CUSTOM' | 'TITLE' | 'ARTIST' | 'ALBUM' | 'DURATION';
 
 // History Item type for navigation
 interface HistoryState {
@@ -91,6 +92,10 @@ const App: React.FC = () => {
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [libraryTab, setLibraryTab] = useState<LibraryTab>('PLAYLISTS');
   
+  // View Sorting State
+  const [sortOption, setSortOption] = useState<SortOption>('CUSTOM');
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+
   // Settings State
   const [accentColor, setAccentColor] = useState('#1db954');
   const [showVisualizer, setShowVisualizer] = useState(true);
@@ -198,9 +203,8 @@ const App: React.FC = () => {
     // 2. Default Popular Content
     try {
         const [popRes, hitsRes] = await Promise.all([
-            searchAll('party hits'),
-            searchAll('tidal picks')
-            
+            searchAll('Pop'),
+            searchAll('Top Hits')
         ]);
 
         if (popRes.playlists.length > 0) {
@@ -228,6 +232,12 @@ const App: React.FC = () => {
     updateConnectionStatus();
     fetchHomeContent();
   }, []);
+
+  // Reset sort when view changes
+  useEffect(() => {
+    setSortOption('CUSTOM');
+    setIsSortDropdownOpen(false);
+  }, [view, selectedEntity]);
 
   // Update document title
   useEffect(() => {
@@ -610,20 +620,36 @@ const App: React.FC = () => {
      );
   };
 
+  const getSortedTracks = (tracks: Track[]) => {
+      const copy = [...tracks];
+      switch(sortOption) {
+          case 'TITLE': return copy.sort((a, b) => a.title.localeCompare(b.title));
+          case 'ARTIST': return copy.sort((a, b) => a.artist.name.localeCompare(b.artist.name));
+          case 'ALBUM': return copy.sort((a, b) => a.album.title.localeCompare(b.album.title));
+          case 'DURATION': return copy.sort((a, b) => a.duration - b.duration);
+          default: return copy;
+      }
+  };
+
   const renderDetailsHeader = (type: string, title: string, subtitle: string, image: string, isSaved: boolean) => (
     <div className="flex flex-col md:flex-row gap-6 mb-8 items-center md:items-end">
-        <img src={image} className={`w-48 h-48 md:w-56 md:h-56 shadow-2xl ${type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'}`} />
-        <div className="flex flex-col gap-4 text-center md:text-left flex-1">
+        <img src={image} className={`w-48 h-48 md:w-56 md:h-56 shadow-2xl ${type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'} object-cover`} />
+        <div className="flex flex-col gap-4 text-center md:text-left flex-1 min-w-0">
             <span className="text-sm font-bold uppercase tracking-wider">{type === 'LIKED_SONGS' ? 'Playlist' : type}</span>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight">{title}</h1>
+            <div className="flex flex-col">
+                <h1 className="text-4xl md:text-6xl font-bold tracking-tight break-words">{title}</h1>
+                {selectedEntity?.description && type === 'PLAYLIST' && (
+                    <p className="text-[#b3b3b3] mt-2 text-sm max-w-2xl">{selectedEntity.description}</p>
+                )}
+            </div>
             <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-[#b3b3b3]">
                 {type !== 'ARTIST' && <span>{subtitle}</span>}
                 {type === 'PLAYLIST' && <span>• {detailTracks.length} songs</span>}
             </div>
-            <div className="flex items-center justify-center md:justify-start gap-4 mt-2">
+            <div className="flex items-center justify-center md:justify-start gap-4 mt-2 flex-wrap">
                 <button 
                     onClick={() => detailTracks.length > 0 && playTrack(detailTracks[0], detailTracks)}
-                    className="w-14 h-14 rounded-full bg-[#1db954] hover:scale-105 transition-transform flex items-center justify-center shadow-lg"
+                    className="w-14 h-14 rounded-full bg-[#1db954] hover:scale-105 transition-transform flex items-center justify-center shadow-lg flex-shrink-0"
                     style={{ backgroundColor: accentColor }}
                 >
                     <div className="ml-1 w-0 h-0 border-t-[10px] border-t-transparent border-l-[16px] border-l-black border-b-[10px] border-b-transparent"></div>
@@ -641,6 +667,33 @@ const App: React.FC = () => {
                         <Pencil size={24} />
                     </button>
                 )}
+                
+                {/* Playlist Sort Dropdown */}
+                {type === 'PLAYLIST' && (
+                    <div className="relative">
+                         <button 
+                            onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                            className={`p-2 hover:text-white transition-colors flex items-center gap-1 ${sortOption !== 'CUSTOM' ? 'text-green-500' : 'text-[#b3b3b3]'}`}
+                        >
+                            <span className="text-sm font-medium hidden md:block">Sort</span>
+                            <ArrowDownUp size={20} />
+                         </button>
+                         {isSortDropdownOpen && (
+                             <div className="absolute top-full left-0 mt-2 bg-[#282828] rounded shadow-xl z-50 py-1 w-40 border border-[#3e3e3e]">
+                                 {(['CUSTOM', 'TITLE', 'ARTIST', 'ALBUM', 'DURATION'] as SortOption[]).map(opt => (
+                                     <button 
+                                        key={opt}
+                                        onClick={() => { setSortOption(opt); setIsSortDropdownOpen(false); }}
+                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-[#3e3e3e] ${sortOption === opt ? 'text-green-500' : 'text-white'}`}
+                                     >
+                                         {opt.charAt(0) + opt.slice(1).toLowerCase()}
+                                     </button>
+                                 ))}
+                             </div>
+                         )}
+                    </div>
+                )}
+
                 {/* Export Actions */}
                 <div className="flex gap-2 ml-2">
                     <button 
@@ -710,8 +763,8 @@ const App: React.FC = () => {
              )}
           </div>
           <div className="hidden md:flex items-center gap-4">
-            <Button variant="secondary" size="sm" onClick={() => window.open('https://github.com/redretep/spofree/', '_blank')} className="flex items-center gap-2">
-                <Github size={16} /><span>Source Code</span>
+            <Button variant="secondary" size="sm" onClick={() => window.open('https://github.com/redretep/spofree/tree/main', '_blank')} className="flex items-center gap-2">
+                <Github size={16} /><span>GitHub</span>
             </Button>
           </div>
         </div>
@@ -906,7 +959,7 @@ const App: React.FC = () => {
                             isEntitySaved()
                         )}
                         <TrackList 
-                            tracks={detailTracks} 
+                            tracks={getSortedTracks(detailTracks)} 
                             onPlay={(t) => playTrack(t, detailTracks)} 
                             currentTrackId={currentTrack?.id} 
                             onArtistClick={handleArtistClick}
@@ -995,7 +1048,35 @@ const App: React.FC = () => {
       <DownloadManager singleDownload={singleDownloadState} zipDownload={zipDownloadState} />
 
       {showImportModal && <ImportModal onClose={() => setShowImportModal(false)} onImport={(title, tracks) => { const p = storageService.createPlaylist(title); tracks.forEach(t => storageService.addTrackToPlaylist(p.uuid, t)); refreshLibrary(); }} />}
-      {showPlaylistEditModal && selectedEntity && <PlaylistEditModal playlist={selectedEntity} onClose={() => setShowPlaylistEditModal(false)} onSave={(id, title) => { storageService.renamePlaylist(id, title); refreshLibrary(); selectedEntity.title = title; }} onDelete={(id) => { storageService.deletePlaylist(id); refreshLibrary(); navigateTo({ view: ViewState.LIBRARY }); }} />}
+      
+      {showPlaylistEditModal && selectedEntity && (
+        <PlaylistEditModal 
+            playlist={selectedEntity} 
+            onClose={() => setShowPlaylistEditModal(false)} 
+            onSave={(id, updates, tracks) => { 
+                storageService.updatePlaylist(id, updates);
+                storageService.updatePlaylistTracks(id, tracks);
+                
+                // Update local state deeply to reflect changes immediately
+                selectedEntity.title = updates.title;
+                selectedEntity.description = updates.description;
+                selectedEntity.image = updates.image;
+                selectedEntity.tracks = tracks;
+                // Force update history stack if sorting or tracks changed in this view
+                const newStack = [...historyStack];
+                newStack[historyIndex].detailTracks = tracks;
+                setHistoryStack(newStack);
+
+                refreshLibrary(); 
+            }} 
+            onDelete={(id) => { 
+                storageService.deletePlaylist(id); 
+                refreshLibrary(); 
+                navigateTo({ view: ViewState.LIBRARY }); 
+            }} 
+        />
+      )}
+
       {showSettingsModal && (
         <SettingsModal 
             onClose={() => setShowSettingsModal(false)} 

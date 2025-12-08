@@ -18,6 +18,7 @@ export interface Album {
 export interface Playlist {
   uuid: string;
   title: string;
+  description?: string;
   image: string;
   creator: { name: string };
   isLocal?: boolean; // Flag for user created playlists
