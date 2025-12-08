@@ -1,4 +1,5 @@
 
+
 export interface Artist {
   id: number | string;
   name: string;
@@ -31,12 +32,10 @@ export interface Track {
   duration: number; // in seconds
   streamUrl?: string; // Direct URL if available
   quality?: 'LOW' | 'HIGH' | 'LOSSLESS' | 'HI_RES';
+  lyrics?: string; // Synced lyrics or plain text
 }
 
-export interface LyricsLine {
-  time: number;
-  text: string;
-}
+export type RepeatMode = 'OFF' | 'ALL' | 'ONE';
 
 export interface PlayerState {
   currentTrack: Track | null;
@@ -45,7 +44,7 @@ export interface PlayerState {
   progress: number;
   queue: Track[];
   isShuffling: boolean;
-  isRepeating: boolean;
+  repeatMode: RepeatMode;
 }
 
 export enum ViewState {
@@ -65,8 +64,30 @@ export interface SearchResult {
   playlists: Playlist[];
 }
 
+export type AudioQuality = 'LOW' | 'HIGH' | 'LOSSLESS' | 'HI_RES';
+
+export interface RecentlyPlayedItem {
+  type: 'TRACK' | 'ALBUM' | 'ARTIST' | 'PLAYLIST';
+  data: Track | Album | Artist | Playlist;
+  timestamp: number;
+}
+
 export interface LocalStorageData {
   likedSongs: Track[];
   playlists: Playlist[];
+  savedAlbums: Album[];
+  followedArtists: Artist[];
   searchHistory: string[];
+  audioQuality: AudioQuality;
+  recentlyPlayed: RecentlyPlayedItem[];
+  accentColor: string;
+  showVisualizer: boolean;
+  showStats: boolean;
+  compactMode: boolean;
+  reducedMotion: boolean;
+  grayscaleMode: boolean;
+  squareAvatars: boolean;
+  highPerformanceMode: boolean;
+  disableGlow: boolean;
+  updateTitle: boolean;
 }
