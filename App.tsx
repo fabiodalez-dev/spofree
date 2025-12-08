@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Player } from './components/Player';
 import { Sidebar } from './components/Sidebar';
@@ -16,13 +15,14 @@ import {
     getAlbumTracks, getArtistTopTracks, getPlaylistTracks, getArtistAlbums, downloadTrackBlob, downloadBlobWithProgress 
 } from './services/hifiService';
 import { storageService } from './services/storageService';
-import { ChevronLeft, ChevronRight, Search, Home, Library, Heart, Github, Pencil, Settings, Download, Archive, Loader2, Plus, Disc, Mic2, ListMusic, ArrowDownUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Home, Library, Heart, Github, Pencil, Settings, Download, Archive, Loader2, Plus, Disc, Mic2, ListMusic, ArrowDownUp, LayoutGrid, List } from 'lucide-react';
 import { Button } from './components/Button';
 import JSZip from 'jszip';
 
 type CategoryFilter = 'ALL' | 'TRACKS' | 'ALBUMS' | 'ARTISTS' | 'PLAYLISTS';
-type LibraryTab = 'PLAYLISTS' | 'LIKED_SONGS' | 'ALBUMS' | 'ARTISTS';
+type LibraryTab = 'ALL' | 'PLAYLISTS' | 'LIKED_SONGS' | 'ALBUMS' | 'ARTISTS';
 type SortOption = 'CUSTOM' | 'TITLE' | 'ARTIST' | 'ALBUM' | 'DURATION';
+type ViewMode = 'GRID' | 'LIST';
 
 // History Item type for navigation
 interface HistoryState {
@@ -79,6 +79,9 @@ const App: React.FC = () => {
   // Search State
   const [searchInput, setSearchInput] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  const [activeSearchCategory, setActiveSearchCategory] = useState<CategoryFilter>('ALL');
+  const [visibleSongsCount, setVisibleSongsCount] = useState(10);
+
   const [resultTracks, setResultTracks] = useState<Track[]>([]);
   const [resultAlbums, setResultAlbums] = useState<Album[]>([]);
   const [resultArtists, setResultArtists] = useState<Artist[]>([]);
@@ -90,7 +93,8 @@ const App: React.FC = () => {
   const [savedAlbums, setSavedAlbums] = useState<Album[]>([]);
   const [followedArtists, setFollowedArtists] = useState<Artist[]>([]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
-  const [libraryTab, setLibraryTab] = useState<LibraryTab>('PLAYLISTS');
+  const [libraryTab, setLibraryTab] = useState<LibraryTab>('ALL');
+  const [libraryViewMode, setLibraryViewMode] = useState<ViewMode>('GRID');
   
   // View Sorting State
   const [sortOption, setSortOption] = useState<SortOption>('CUSTOM');
@@ -174,25 +178,24 @@ const App: React.FC = () => {
     );
 
     if (lastArtistItem) {
-        let artistId, artistName;
+        let artistName;
         if (lastArtistItem.type === 'ARTIST') {
-            artistId = (lastArtistItem.data as Artist).id;
             artistName = (lastArtistItem.data as Artist).name;
         } else if (lastArtistItem.type === 'ALBUM') {
-             artistId = (lastArtistItem.data as Album).artist?.id;
              artistName = (lastArtistItem.data as Album).artist?.name;
         } else if (lastArtistItem.type === 'TRACK') {
-             artistId = (lastArtistItem.data as Track).artist.id;
              artistName = (lastArtistItem.data as Track).artist.name;
         }
 
-        if (artistId && artistName) {
+        if (artistName) {
             try {
-                const albums = await getArtistAlbums(artistId);
-                if (albums.length > 0) {
+                // Modified: Search for albums by the artist name to get search results (recommendations)
+                // instead of full discography
+                const searchRes = await searchAll(artistName);
+                if (searchRes.albums.length > 0) {
                     sections.push({
                         title: `More from ${artistName}`,
-                        items: albums.slice(0, 5),
+                        items: searchRes.albums.slice(0, 5),
                         type: 'ALBUM'
                     });
                 }
@@ -204,21 +207,21 @@ const App: React.FC = () => {
     try {
         const [popRes, hitsRes] = await Promise.all([
             searchAll('Pop'),
-            searchAll('Top Hits')
+            searchAll('Tidal Hits') // Changed Default
         ]);
 
-        if (popRes.playlists.length > 0) {
+        if (hitsRes.playlists.length > 0) {
             sections.push({
-                title: 'Popular Playlists',
-                items: popRes.playlists.slice(0, 5),
+                title: 'Top Playlists',
+                items: hitsRes.playlists.slice(0, 5),
                 type: 'PLAYLIST'
             });
         }
         
-        if (hitsRes.albums.length > 0) {
+        if (popRes.albums.length > 0) {
             sections.push({
                 title: 'Trending Albums',
-                items: hitsRes.albums.slice(0, 5),
+                items: popRes.albums.slice(0, 5),
                 type: 'ALBUM'
             });
         }
@@ -416,6 +419,8 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setHasSearched(true);
+    setActiveSearchCategory('ALL'); // Reset filter on new search
+    setVisibleSongsCount(10); // Reset pagination
     
     setResultTracks([]); setResultAlbums([]); setResultArtists([]); setResultPlaylists([]);
     
@@ -619,6 +624,74 @@ const App: React.FC = () => {
         </div>
      );
   };
+  
+  const LibraryItem = ({ item, type, onClick, subtitle }: any) => {
+      if (libraryViewMode === 'LIST') {
+          return (
+              <div onClick={onClick} className="flex items-center gap-3 p-2 hover:bg-[#282828] rounded-md cursor-pointer group animate-fade-in">
+                  <img src={item.image || item.cover || item.picture} className={`w-12 h-12 object-cover shadow-sm ${type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'}`} />
+                  <div className="flex-1 min-w-0">
+                      <h3 className="font-bold truncate text-white text-sm">{item.title || item.name}</h3>
+                      <p className="text-xs text-[#b3b3b3] truncate">{subtitle}</p>
+                  </div>
+              </div>
+          )
+      }
+      // GRID
+      return (
+        <div onClick={onClick} className="bg-[#181818] p-4 rounded-md hover:bg-[#282828] cursor-pointer group transition-colors animate-fade-in">
+            <img src={item.image || item.cover || item.picture} className={`w-full aspect-square object-cover shadow-lg mb-4 ${type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'}`} />
+            <h3 className="font-bold truncate mb-1">{item.title || item.name}</h3>
+            <p className="text-sm text-[#b3b3b3] truncate">{subtitle}</p>
+        </div>
+      )
+  };
+
+  const LibraryCollection = ({ items, type, emptyMessage }: any) => {
+      if (items.length === 0) return <div className="text-[#b3b3b3] p-4">{emptyMessage}</div>;
+      
+      const containerClass = libraryViewMode === 'GRID' 
+        ? "grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+        : "flex flex-col gap-1";
+
+      return (
+          <div className={`${containerClass} animate-slide-up`}>
+              {items.map((item: any) => {
+                   let subtitle = '';
+                   let clickHandler = () => {};
+                   
+                   if (type === 'PLAYLIST') {
+                       subtitle = `By ${item.creator.name}`;
+                       clickHandler = () => handleEntityClick('PLAYLIST', item);
+                   } else if (type === 'ALBUM') {
+                       subtitle = item.artist.name;
+                       clickHandler = () => handleEntityClick('ALBUM', item);
+                   } else if (type === 'ARTIST') {
+                       subtitle = 'Artist';
+                       clickHandler = () => handleEntityClick('ARTIST', item);
+                   } else if (type === 'LIKED_SONGS') {
+                       subtitle = `${item.count} songs`;
+                       clickHandler = () => {
+                           refreshLibrary(); 
+                           const tracks = storageService.getLikedSongs();
+                           const entity = { title: 'Liked Songs', cover: 'https://misc.scdn.co/liked-songs/liked-songs-640.png', artist: { name: 'You' } };
+                           navigateTo({ view: ViewState.LIKED_SONGS, entity, detailTracks: tracks });
+                       };
+                   }
+
+                   return (
+                       <LibraryItem 
+                            key={item.uuid || item.id} 
+                            item={item} 
+                            type={type} 
+                            onClick={clickHandler}
+                            subtitle={subtitle}
+                        />
+                   );
+              })}
+          </div>
+      );
+  };
 
   const getSortedTracks = (tracks: Track[]) => {
       const copy = [...tracks];
@@ -632,7 +705,7 @@ const App: React.FC = () => {
   };
 
   const renderDetailsHeader = (type: string, title: string, subtitle: string, image: string, isSaved: boolean) => (
-    <div className="flex flex-col md:flex-row gap-6 mb-8 items-center md:items-end">
+    <div className="flex flex-col md:flex-row gap-6 mb-8 items-center md:items-end animate-slide-up">
         <img src={image} className={`w-48 h-48 md:w-56 md:h-56 shadow-2xl ${type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'} object-cover`} />
         <div className="flex flex-col gap-4 text-center md:text-left flex-1 min-w-0">
             <span className="text-sm font-bold uppercase tracking-wider">{type === 'LIKED_SONGS' ? 'Playlist' : type}</span>
@@ -771,14 +844,15 @@ const App: React.FC = () => {
         
         <div className="flex flex-1 overflow-hidden">
             {/* Main Content Area */}
-            <div className="flex-1 overflow-y-auto bg-[#121212]" ref={mainContentRef}>
+            {/* key={view} forces a re-mount to trigger animation when switching tabs */}
+            <div className="flex-1 overflow-y-auto bg-[#121212]" ref={mainContentRef} key={view}>
             <div className="h-16"></div>
-            <div className="px-4 md:px-6 pb-40">
+            <div className="px-4 md:px-6 pb-40 animate-fade-in">
                 {error && <div className="bg-red-500/20 text-red-100 p-4 rounded mb-6 text-sm">{error}</div>}
 
                 {view === ViewState.HOME && !isLoading && (
                     <div>
-                        <h1 className="text-3xl font-bold mb-6">Good evening</h1>
+                        <h1 className="text-3xl font-bold mb-6">What do you want to listen to?</h1>
                         
                         {recentlyPlayed.length > 0 && (
                             <div className="mb-8">
@@ -819,46 +893,47 @@ const App: React.FC = () => {
                 
                 {view === ViewState.LIBRARY && (
                     <div>
-                        <div className="flex items-center gap-4 mb-6">
+                        <div className="flex items-center justify-between gap-4 mb-6">
                             <h1 className="text-3xl font-bold">Your Library</h1>
+                             {/* View Toggle */}
+                            <div className="flex items-center gap-2 bg-[#282828] p-1 rounded-lg">
+                                <button onClick={() => setLibraryViewMode('GRID')} className={`p-1.5 rounded transition-colors ${libraryViewMode === 'GRID' ? 'bg-[#3e3e3e] text-white' : 'text-[#b3b3b3] hover:text-white'}`}><LayoutGrid size={16} /></button>
+                                <button onClick={() => setLibraryViewMode('LIST')} className={`p-1.5 rounded transition-colors ${libraryViewMode === 'LIST' ? 'bg-[#3e3e3e] text-white' : 'text-[#b3b3b3] hover:text-white'}`}><List size={16} /></button>
+                            </div>
                         </div>
                         
                         {/* Library Tabs */}
-                        <div className="flex gap-2 mb-6 overflow-x-auto">
-                            <button onClick={() => setLibraryTab('PLAYLISTS')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${libraryTab === 'PLAYLISTS' ? 'bg-white text-black' : 'bg-[#2a2a2a] text-white hover:bg-[#3e3e3e]'}`}>Playlists</button>
-                            <button onClick={() => setLibraryTab('LIKED_SONGS')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${libraryTab === 'LIKED_SONGS' ? 'bg-white text-black' : 'bg-[#2a2a2a] text-white hover:bg-[#3e3e3e]'}`}>Liked Songs</button>
-                            <button onClick={() => setLibraryTab('ALBUMS')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${libraryTab === 'ALBUMS' ? 'bg-white text-black' : 'bg-[#2a2a2a] text-white hover:bg-[#3e3e3e]'}`}>Albums</button>
-                            <button onClick={() => setLibraryTab('ARTISTS')} className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${libraryTab === 'ARTISTS' ? 'bg-white text-black' : 'bg-[#2a2a2a] text-white hover:bg-[#3e3e3e]'}`}>Artists</button>
+                        <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+                            {(['ALL', 'PLAYLISTS', 'LIKED_SONGS', 'ALBUMS', 'ARTISTS'] as LibraryTab[]).map(tab => (
+                                <button 
+                                    key={tab}
+                                    onClick={() => setLibraryTab(tab)} 
+                                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${libraryTab === tab ? 'bg-white text-black' : 'bg-[#2a2a2a] text-white hover:bg-[#3e3e3e]'}`}
+                                >
+                                    {tab === 'ALL' ? 'All' : tab.charAt(0) + tab.slice(1).toLowerCase().replace('_', ' ')}
+                                </button>
+                            ))}
                         </div>
 
-                        {libraryTab === 'PLAYLISTS' && (
-                            <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                                <div onClick={() => { 
-                                        refreshLibrary(); 
-                                        const tracks = storageService.getLikedSongs();
-                                        const entity = { title: 'Liked Songs', cover: 'https://misc.scdn.co/liked-songs/liked-songs-640.png', artist: { name: 'You' } };
-                                        navigateTo({ view: ViewState.LIKED_SONGS, entity, detailTracks: tracks });
-                                    }}
-                                    className="bg-gradient-to-br from-indigo-800 to-blue-800 p-4 rounded-md cursor-pointer aspect-square flex flex-col justify-end shadow-lg">
-                                    <Heart className="text-white mb-2" size={32} fill="white" />
-                                    <h3 className="font-bold text-xl">Liked Songs</h3>
-                                    <p className="text-sm text-white/70">{likedSongs.length} songs</p>
-                                </div>
-                                
-                                <div onClick={() => setShowImportModal(true)} className="bg-[#181818] p-4 rounded-md hover:bg-[#282828] cursor-pointer aspect-square flex flex-col items-center justify-center group border-2 border-dashed border-[#282828] hover:border-[#4d4d4d] transition-colors">
-                                        <div className="bg-[#282828] p-4 rounded-full mb-3 group-hover:scale-110 transition-transform">
-                                            <Plus size={24} className="text-[#b3b3b3] group-hover:text-white" />
-                                        </div>
-                                        <span className="font-bold text-[#b3b3b3] group-hover:text-white">Import Playlist</span>
-                                </div>
-
-                                {playlists.map(p => (
-                                    <div key={p.uuid} onClick={() => handleEntityClick('PLAYLIST', p)} className="bg-[#181818] p-4 rounded-md hover:bg-[#282828] cursor-pointer">
-                                        <img src={p.image} className="w-full aspect-square object-cover shadow-lg rounded-md mb-4" />
-                                        <h3 className="font-bold truncate">{p.title}</h3>
-                                        <p className="text-sm text-[#b3b3b3]">By {p.creator.name}</p>
-                                    </div>
-                                ))}
+                        {(libraryTab === 'ALL' || libraryTab === 'PLAYLISTS' || libraryTab === 'LIKED_SONGS') && (
+                            <div className="mb-8">
+                                {(libraryTab === 'ALL' || libraryTab === 'PLAYLISTS') && <h2 className="text-xl font-bold mb-4">Playlists</h2>}
+                                <LibraryCollection 
+                                    items={[
+                                        ...(libraryTab === 'ALL' || libraryTab === 'LIKED_SONGS' ? [{
+                                            id: 'liked-songs',
+                                            title: 'Liked Songs',
+                                            image: 'https://misc.scdn.co/liked-songs/liked-songs-640.png',
+                                            creator: { name: 'You' },
+                                            count: likedSongs.length,
+                                            type: 'LIKED_SONGS' // Special marker
+                                        }] : []),
+                                        ...(libraryTab === 'ALL' || libraryTab === 'PLAYLISTS' ? playlists : [])
+                                    ]}
+                                    type={libraryTab === 'LIKED_SONGS' ? 'LIKED_SONGS' : 'PLAYLIST'}
+                                    emptyMessage="No playlists found."
+                                />
+                                {libraryTab === 'ALL' && <div className="h-px bg-[#282828] my-8"></div>}
                             </div>
                         )}
 
@@ -875,28 +950,19 @@ const App: React.FC = () => {
                             />
                         )}
 
-                        {libraryTab === 'ALBUMS' && (
-                            savedAlbums.length > 0 ? (
-                                <MediaGrid title="Saved Albums" items={savedAlbums} type="album" />
-                            ) : (
-                                <div className="text-center text-[#b3b3b3] mt-20">
-                                    <Disc size={48} className="mx-auto mb-4 opacity-50" />
-                                    <h3 className="text-xl font-bold mb-2">No saved albums</h3>
-                                    <p>Save albums to your library to see them here.</p>
-                                </div>
-                            )
+                        {(libraryTab === 'ALL' || libraryTab === 'ALBUMS') && (
+                            <div className="mb-8">
+                                {libraryTab === 'ALL' && <h2 className="text-xl font-bold mb-4">Albums</h2>}
+                                <LibraryCollection items={savedAlbums} type="ALBUM" emptyMessage="No saved albums." />
+                                {libraryTab === 'ALL' && <div className="h-px bg-[#282828] my-8"></div>}
+                            </div>
                         )}
 
-                         {libraryTab === 'ARTISTS' && (
-                             followedArtists.length > 0 ? (
-                                <MediaGrid title="Followed Artists" items={followedArtists} type="artist" />
-                            ) : (
-                                <div className="text-center text-[#b3b3b3] mt-20">
-                                    <Mic2 size={48} className="mx-auto mb-4 opacity-50" />
-                                    <h3 className="text-xl font-bold mb-2">No followed artists</h3>
-                                    <p>Follow artists to see them here.</p>
-                                </div>
-                            )
+                        {(libraryTab === 'ALL' || libraryTab === 'ARTISTS') && (
+                             <div>
+                                {libraryTab === 'ALL' && <h2 className="text-xl font-bold mb-4">Artists</h2>}
+                                <LibraryCollection items={followedArtists} type="ARTIST" emptyMessage="No followed artists." />
+                             </div>
                         )}
                     </div>
                 )}
@@ -907,15 +973,29 @@ const App: React.FC = () => {
                             <div className="flex justify-center mt-20"><Loader2 className="animate-spin" size={48} /></div>
                         ) : hasSearched ? (
                             <>
+                                {/* Search Category Filters */}
+                                <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                                    {(['ALL', 'TRACKS', 'ALBUMS', 'ARTISTS', 'PLAYLISTS'] as CategoryFilter[]).map(cat => (
+                                        <button 
+                                            key={cat}
+                                            onClick={() => setActiveSearchCategory(cat)}
+                                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeSearchCategory === cat ? 'bg-white text-black' : 'bg-[#2a2a2a] text-white hover:bg-[#3e3e3e]'}`}
+                                        >
+                                            {cat === 'ALL' ? 'All' : cat.charAt(0) + cat.slice(1).toLowerCase()}
+                                        </button>
+                                    ))}
+                                </div>
+
                                 {resultTracks.length === 0 && resultAlbums.length === 0 && resultArtists.length === 0 && (
                                     <div className="text-center text-[#b3b3b3] mt-20">No results found for "{searchHistory[0]}"</div>
                                 )}
                                 
-                                {resultTracks.length > 0 && (
-                                    <div className="mb-8">
+                                {/* Songs Section */}
+                                {(activeSearchCategory === 'ALL' || activeSearchCategory === 'TRACKS') && resultTracks.length > 0 && (
+                                    <div className="mb-8 animate-slide-up">
                                         <h2 className="text-2xl font-bold mb-4">Songs</h2>
                                         <TrackList 
-                                            tracks={resultTracks.slice(0, 5)} 
+                                            tracks={activeSearchCategory === 'ALL' ? resultTracks.slice(0, 5) : resultTracks.slice(0, visibleSongsCount)} 
                                             onPlay={(t) => playTrack(t, resultTracks)} 
                                             currentTrackId={currentTrack?.id} 
                                             onArtistClick={handleArtistClick}
@@ -924,17 +1004,35 @@ const App: React.FC = () => {
                                             accentColor={accentColor}
                                             compactMode={compactMode}
                                         />
+                                        {activeSearchCategory === 'TRACKS' && resultTracks.length > visibleSongsCount && (
+                                            <div className="mt-4">
+                                                <button 
+                                                    onClick={() => setVisibleSongsCount(prev => prev + 10)}
+                                                    className="px-4 py-2 bg-transparent border border-[#535353] rounded-full text-sm font-bold hover:border-white transition-colors"
+                                                >
+                                                    Load More
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                                 
-                                <MediaGrid title="Albums" items={resultAlbums} type="album" />
-                                <MediaGrid title="Artists" items={resultArtists} type="artist" />
-                                <MediaGrid title="Playlists" items={resultPlaylists} type="playlist" />
+                                {(activeSearchCategory === 'ALL' || activeSearchCategory === 'ALBUMS') && (
+                                    <MediaGrid title="Albums" items={resultAlbums} type="album" />
+                                )}
+
+                                {(activeSearchCategory === 'ALL' || activeSearchCategory === 'ARTISTS') && (
+                                    <MediaGrid title="Artists" items={resultArtists} type="artist" />
+                                )}
+
+                                {(activeSearchCategory === 'ALL' || activeSearchCategory === 'PLAYLISTS') && (
+                                    <MediaGrid title="Playlists" items={resultPlaylists} type="playlist" />
+                                )}
                             </>
                         ) : (
                              // Recent Searches
                              searchHistory.length > 0 && (
-                                <div>
+                                <div className="animate-fade-in">
                                     <h2 className="text-xl font-bold mb-4">Recent Searches</h2>
                                     <div className="flex flex-wrap gap-2">
                                         {searchHistory.map((q, i) => (
@@ -950,7 +1048,7 @@ const App: React.FC = () => {
                 )}
 
                 {(view === ViewState.ALBUM_DETAILS || view === ViewState.PLAYLIST_DETAILS || view === ViewState.LIKED_SONGS) && selectedEntity && (
-                    <div>
+                    <div className="animate-slide-up">
                         {renderDetailsHeader(
                             view === ViewState.LIKED_SONGS ? 'LIKED_SONGS' : (view === ViewState.ALBUM_DETAILS ? 'ALBUM' : 'PLAYLIST'),
                             selectedEntity.title,
@@ -972,7 +1070,7 @@ const App: React.FC = () => {
                 )}
 
                 {view === ViewState.ARTIST_DETAILS && selectedEntity && (
-                     <div>
+                     <div className="animate-slide-up">
                         {renderDetailsHeader(
                             'ARTIST',
                             selectedEntity.name,
@@ -1001,7 +1099,7 @@ const App: React.FC = () => {
 
             {/* Right Sidebar */}
             {rightSidebarMode && (
-                <div className="w-[300px] hidden lg:block border-l border-[#282828] flex-none">
+                <div className="w-[300px] hidden lg:block border-l border-[#282828] flex-none animate-slide-right">
                     <RightSidebar 
                         mode={rightSidebarMode}
                         queue={queue}
