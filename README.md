@@ -2,18 +2,25 @@
 
 SpoFree is a free, open-source, and ad-free music player with a massive catalogue and a clean interface similar to Spotify. No account, no login, no setup. Just open it and start listening.
 
-## ✨ Features
+## Features
 
-- 🚫 **Ad-Free Listening** for uninterrupted playback  
-- 🔊 **Lossless Audio** for hifi sound  
-- 🎵 **Huge Catalogue** powered by the full TIDAL library and HiFi APIs
-- 🖼️ **Clean UI** similar to Spotify  
-- ▶️ **Playlist Support** create and import your own Playlists
-- 💾 **Local Storage** playlists, liked songs, recently listened saved via IndexDB in your browser
-- 🔎 **Advanced Search** find tracks, albums, artists, playlists  
-- 🗄️ **Search Filters** sort by album, track, artist, or playlist
-- 💿 **Export** songs, playlists, albums and liked songs as csv or zip
-- 📌 **More features coming soon**
+- **Ad-Free Listening** from Tidal
+- **Lossless Audio** for hifi sound
+- **Huge Catalogue** powered by the full TIDAL library and HiFi APIs
+- **Clean UI** similar to Spotify
+- **Playlist Support** create and import your own Playlists
+- **Local Storage** playlists, liked songs, recently listened saved via IndexDB in your browser
+- **Advanced Search** find tracks, albums, artists, playlists
+- **Search Filters** sort by album, track, artist, or playlist
+- **Export** songs, playlists, albums and liked songs as csv or zip
+- **Sleep Timer** with customizable length
+- **Queue** that you can save as a playlist and customize
+- **Media Session API** for lock screen and control center support
+- **Library Tabs** Organized library with Playlists, Liked Songs, Saved Albums, and Followed Artists.
+- **Import Playlist** via Modal to import playlists via Text (Artist - Title) or CSV file.
+- **Audio Quality Selector** ability to switch between Low, High, Lossless, and Hi-Res audio qualities.
+- **Accent Color** you can select that themes the player, sliders, and active elements.
+- **More features coming soon**
 
 ## 🌐 Live Versions
 
