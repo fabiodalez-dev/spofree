@@ -198,7 +198,7 @@ const App: React.FC = () => {
     // 2. Default Popular Content
     try {
         const [popRes, hitsRes] = await Promise.all([
-            searchAll('party 2010'),
+            searchAll('party hits'),
             searchAll('tidal picks')
             
         ]);
