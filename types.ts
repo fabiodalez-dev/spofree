@@ -34,6 +34,8 @@ export interface Track {
   streamUrl?: string; // Direct URL if available
   quality?: 'LOW' | 'HIGH' | 'LOSSLESS' | 'HI_RES';
   lyrics?: string; // Synced lyrics or plain text
+  isLocalFile?: boolean;
+  localFileId?: string;
 }
 
 export type RepeatMode = 'OFF' | 'ALL' | 'ONE';
