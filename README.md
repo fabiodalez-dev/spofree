@@ -1,36 +1,36 @@
 # 🎶 SpoFree
-<img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/home.jpeg" width="100%">
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fredretep%2Fspofree%2F)
+[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](app.netlify.com/https://github.com/redretep/spofree)
+<img src="https://raw.githubusercontent.com/redretep/spofree/ae27a51a154f159ff419b094830b916c00a6a4a2/images/album.jpeg" width="100%">
 SpoFree is a free, open-source, and ad-free music player with a massive catalogue and a clean interface similar to Spotify. No account, no login, no setup. Just open it and start listening.
 
 ## Features
 
-- **Ad-Free Listening** from Tidal
-- **Lossless Audio** for hifi sound
-- **Huge Catalogue** powered by the full TIDAL library and HiFi APIs
-- **Clean UI** similar to Spotify
-- **Playlist Support** create and import your own Playlists
-- **Local Storage** playlists, liked songs, recently listened saved via IndexDB in your browser
-- **Advanced Search** find tracks, albums, artists, playlists
-- **Search Filters** sort by album, track, artist, or playlist
-- **Export** songs, playlists, albums and liked songs as csv or zip
-- **Sleep Timer** with customizable length
-- **Queue** that you can save as a playlist and customize
-- **Media Session API** for lock screen and control center support
-- **Library Tabs** Organized library with Playlists, Liked Songs, Saved Albums, and Followed Artists.
-- **Import Playlist** via Modal to import playlists via Text (Artist - Title) or CSV file.
-- **Audio Quality Selector** ability to switch between Low, High, Lossless, and Hi-Res audio qualities.
-- **Accent Color** you can select that themes the player, sliders, and active elements.
-- **More features coming soon**
-- **Additional Settings** like compact mode, square avatars, grayscale mode
-- **Support for low-end devices** like disable glow, reduced motion, high performance mode
-- **Local File** playing support (.mp3 .m4a and .flac)
+- ❌**Ad-Free Listening** from Tidal
+- 💿**Lossless Audio** for hifi sound
+- 🎧**Huge Catalogue** powered by the full TIDAL library and HiFi APIs
+- 🔲**Clean UI** similar to Spotify
+- 🎶**Playlist Support** create and import your own Playlists
+- 📁**Local Storage** playlists, liked songs, recently listened saved via IndexDB in your browser
+- 🔎**Search** find media and sort by album, track, artist, or playlist
+- 💾**Export** songs, playlists, albums and liked songs as csv or zip containing lossless .flac files
+- ⏰**Sleep Timer** with customizable length
+- 🔢**Queue** that you can save as a playlist and customize
+- 🎵**Media Session API** for lock screen and control center support
+- 📶**Library Tabs** Organized library with Playlists, Liked Songs, Saved Albums, and Followed Artists.
+- 📲**Import Playlist** via Text (Artist - Title) or CSV file or from local files
+- 🎵**Audio Quality Selector** ability to switch between Low, High, Lossless, and Hi-Res audio qualities.
+- 🟥**Accent Color** you can select that themes the player, sliders, and active elements.
+- ⚙️**Additional Settings** like compact mode, square avatars, grayscale mode
+- 📺**Support for low-end devices** like disable glow, reduced motion, high performance mode
+- ❗️**More features coming soon**
 
-## 🌐 Live Versions
+## 🌐 Instances
 
 | Version        | URL                         | Note                          |
 |----------------|------------------------------|-------------------------------|
 | **Stable**     | https://spo.free.nf  | Best version           |
-| **Old/Beta**       | https://spofree-beta.netlify.app | older, may be bad |
+| **Old/Beta**       | https://spofree-beta.netlify.app | very old, may be bad |
 
 ## ⚙️ How It Works
 
@@ -45,8 +45,6 @@ How it works:
 The API instances come from [open-source HiFi projects](https://github.com/EduardPrigoana/hifi-instances) that provide public endpoints.
 
 ## Screenshots
-### Album View:
-<img src="https://raw.githubusercontent.com/redretep/spofree/ae27a51a154f159ff419b094830b916c00a6a4a2/images/album.jpeg" width="50%"> 
 
 ### Audio Quality Selector: 
 <img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/audioquality.jpeg" width="50%"> 
@@ -66,21 +64,13 @@ The API instances come from [open-source HiFi projects](https://github.com/Eduar
 ### Extra Settings:
 <img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/tweaks.jpeg" width="50%">
 
-## 🚀 Deployment
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fredretep%2Fspofree%2F)
-[![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](app.netlify.com/https://github.com/redretep/spofree)
-
-You can deploy your own SpoFree instance for free on services like **Netlify** or **Vercel**.  
-Clone the repo, upload, done.
-
 ## 🤝 Contributing and Issues
 
 Contributions are welcome. Feel free to open a Pull Request. Also please submit any bugs you find!
 
 ## 🔗 Related Projects
 
-- https://github.com/uimaxbai/tidal-ui  
+- https://github.com/uimaxbai/tidal-ui
 - https://github.com/sachinsenal0x64/hifi  
 - https://github.com/uimaxbai/hifi-api  
 - https://github.com/monochrome-music/monochrome  
