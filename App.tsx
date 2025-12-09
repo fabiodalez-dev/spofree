@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Player } from './components/Player';
 import { Sidebar } from './components/Sidebar';
@@ -10,17 +9,13 @@ import { SettingsModal, SettingsTab } from './components/SettingsModal';
 import { AddToPlaylistModal } from './components/AddToPlaylistModal';
 import { RightSidebar } from './components/RightSidebar';
 import { DownloadManager } from './components/DownloadManager';
-import { DetailHeader } from './components/DetailHeader';
-import { MediaGrid } from './components/MediaGrid';
-import { GenreCard } from './components/GenreCard';
-import { CsvFileIcon } from './components/Icons';
 import { ViewState, Track, Album, Artist, Playlist, RecentlyPlayedItem, RepeatMode, AudioQuality } from './types';
 import { 
     searchAll, getStreamUrl, getCurrentApiUrl, 
     getAlbumTracks, getArtistTopTracks, getPlaylistTracks, getArtistAlbums, downloadTrackBlob, downloadBlobWithProgress 
 } from './services/hifiService';
 import { storageService } from './services/storageService';
-import { ChevronLeft, ChevronRight, Search, Home, Library, Heart, Github, Pencil, Settings, Download, Archive, Loader2, Plus, Disc, Mic2, ListMusic, ArrowDownUp, LayoutGrid, List, X, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, Home, Library, Heart, Github, Pencil, Settings, Download, Archive, Loader2, Plus, Disc, Mic2, ListMusic, ArrowDownUp, LayoutGrid, List } from 'lucide-react';
 import { Button } from './components/Button';
 import JSZip from 'jszip';
 
@@ -39,19 +34,19 @@ interface HistoryState {
     detailAlbums?: Album[]; // Added for Artist view
 }
 
-// Fixed genres with colors
-const GENRES = [
-    { name: 'Pop', color: '#8c67ac' },
-    { name: 'Hip-Hop', color: '#ba5d07' },
-    { name: 'Rock', color: '#e91429' },
-    { name: 'Indie', color: '#608108' },
-    { name: 'R&B', color: '#dc148c' },
-    { name: 'Electronic', color: '#148a08' },
-    { name: 'Jazz', color: '#1e3264' },
-    { name: 'Classical', color: '#7d4b32' },
-    { name: 'K-Pop', color: '#bc5900' },
-    { name: 'Metal', color: '#777777' }
-];
+// Custom CSV Icon
+const CsvFileIcon = ({size=24, className=""}: {size?: number, className?: string}) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+      <path d="M8 13h.01" />
+      <path d="M8 17h.01" />
+      <path d="M12 13h.01" />
+      <path d="M12 17h.01" />
+      <path d="M16 13h.01" />
+      <path d="M16 17h.01" />
+    </svg>
+)
 
 const App: React.FC = () => {
   // Navigation State
@@ -211,8 +206,8 @@ const App: React.FC = () => {
     // 2. Default Popular Content
     try {
         const [popRes, hitsRes] = await Promise.all([
-            searchAll('Kanye'), // Changed from Pop to Kanye per user request
-            searchAll('Tidal Hits')
+            searchAll('Pop'),
+            searchAll('Tidal Hits') // Changed Default
         ]);
 
         if (hitsRes.playlists.length > 0) {
@@ -279,122 +274,155 @@ const App: React.FC = () => {
 
   // Navigation Handler
   const navigateTo = (newState: HistoryState) => {
-    const newStack = historyStack.slice(0, historyIndex + 1);
-    setHistoryStack([...newStack, newState]);
-    setHistoryIndex(newStack.length);
+      const newStack = historyStack.slice(0, historyIndex + 1);
+      newStack.push(newState);
+      setHistoryStack(newStack);
+      setHistoryIndex(newStack.length - 1);
+      if (mainContentRef.current) mainContentRef.current.scrollTop = 0;
   };
 
   const goBack = () => {
-    if (historyIndex > 0) {
-      setHistoryIndex(historyIndex - 1);
-    }
+      if (historyIndex > 0) setHistoryIndex(historyIndex - 1);
   };
 
   const goForward = () => {
-    if (historyIndex < historyStack.length - 1) {
-      setHistoryIndex(historyIndex + 1);
-    }
+      if (historyIndex < historyStack.length - 1) setHistoryIndex(historyIndex + 1);
   };
 
-  // Playback Logic
-  const handlePlayTrack = async (track: Track, newQueue?: Track[]) => {
-    try {
-      if (newQueue) {
-        setQueue(newQueue);
-        setOriginalQueue(newQueue); // Assume not shuffled initially
-        setIsShuffling(false);
+  // --- Playback Control & Shuffle Logic ---
+
+  const shuffleQueue = (tracks: Track[], startTrack?: Track) => {
+      let list = [...tracks];
+      if (startTrack) {
+          list = list.filter(t => t.id !== startTrack.id);
       }
-      
-      const streamUrl = await getStreamUrl(track);
-      setCurrentTrack({ ...track, streamUrl });
-      setIsPlaying(true);
-      setError(null);
-
-      storageService.addToRecentlyPlayed({
-          type: 'TRACK',
-          data: track,
-          timestamp: Date.now()
-      });
-      refreshLibrary();
-
-    } catch (err: any) {
-      console.error(err);
-      setError("Failed to play track. It might be region-locked or unavailable.");
-      // Auto-skip logic
-      setTimeout(() => handleNext(), 2000);
-    }
+      for (let i = list.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [list[i], list[j]] = [list[j], list[i]];
+      }
+      if (startTrack) list.unshift(startTrack);
+      return list;
   };
 
-  const handlePlayPause = () => setIsPlaying(!isPlaying);
+  const toggleShuffle = () => {
+      if (!isShuffling) {
+          setOriginalQueue([...queue]); 
+          const shuffled = shuffleQueue(queue, currentTrack || undefined);
+          setQueue(shuffled);
+          setIsShuffling(true);
+      } else {
+          setQueue(originalQueue);
+          setIsShuffling(false);
+      }
+  };
+
+  const toggleRepeat = () => {
+      const modes: RepeatMode[] = ['OFF', 'ALL', 'ONE'];
+      const nextIdx = (modes.indexOf(repeatMode) + 1) % modes.length;
+      setRepeatMode(modes[nextIdx]);
+  };
+
+  const playTrack = async (track: Track, context: Track[] = []) => {
+    if (currentTrack?.id === track.id) {
+      setIsPlaying(!isPlaying);
+      return;
+    }
+    setOriginalQueue(context);
+    if (isShuffling) {
+        setQueue(shuffleQueue(context, track));
+    } else {
+        setQueue(context);
+    }
+    
+    setCurrentTrack(track);
+    setIsPlaying(false);
+    setError(null);
+    
+    storageService.addToRecentlyPlayed({ type: 'TRACK', data: track, timestamp: Date.now() });
+    refreshLibrary();
+
+    try {
+        const streamUrl = await getStreamUrl(track.id);
+        updateConnectionStatus();
+        setCurrentTrack({ ...track, streamUrl });
+        setIsPlaying(true);
+    } catch (err: any) {
+        console.error("Play error:", err);
+        setError("Could not resolve stream. Trying another server...");
+        updateConnectionStatus();
+        setIsPlaying(false);
+    }
+  };
 
   const handleNext = () => {
-    if (!currentTrack || queue.length === 0) return;
-    const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
-    
-    // Repeat One logic
-    if (repeatMode === 'ONE') {
-        if (audioRefCurrent.current) {
-            audioRefCurrent.current.currentTime = 0;
-            audioRefCurrent.current.play();
-        }
-        return;
-    }
-
-    if (currentIndex < queue.length - 1) {
-      handlePlayTrack(queue[currentIndex + 1]);
-    } else if (repeatMode === 'ALL') {
-      handlePlayTrack(queue[0]); // Loop back to start
-    }
+      if (!currentTrack || queue.length === 0) return;
+      if (repeatMode === 'ONE') {
+          const t = currentTrack;
+          setCurrentTrack(null);
+          setTimeout(() => setCurrentTrack(t), 0);
+          return;
+      }
+      const idx = queue.findIndex(t => t.id === currentTrack.id);
+      if (idx < queue.length - 1) {
+          playTrack(queue[idx + 1], queue);
+      } else if (repeatMode === 'ALL') {
+          playTrack(queue[0], queue);
+      }
   };
 
   const handlePrev = () => {
-    if (!currentTrack || queue.length === 0) return;
-    const currentIndex = queue.findIndex(t => t.id === currentTrack.id);
-    if (currentIndex > 0) {
-      handlePlayTrack(queue[currentIndex - 1]);
-    } else {
-       // Loop to end if desired, or restart track
-       handlePlayTrack(queue[0]);
-    }
-  };
-
-  // Needed for direct audio ref manipulation in App (hacky but effective for Repeat ONE logic)
-  const audioRefCurrent = useRef<HTMLAudioElement | null>(null);
-
-  const addToQueue = (track: Track) => {
-      setQueue([...queue, track]);
-      if (!isShuffling) setOriginalQueue([...originalQueue, track]);
-  };
-
-  const handleShuffleToggle = () => {
-      const newShuffleState = !isShuffling;
-      setIsShuffling(newShuffleState);
-      
-      if (newShuffleState) {
-          // Shuffle Logic
-          const shuffled = [...queue].sort(() => Math.random() - 0.5);
-          // Keep current track first if playing
-          if (currentTrack) {
-               const idx = shuffled.findIndex(t => t.id === currentTrack.id);
-               if (idx > -1) {
-                   shuffled.splice(idx, 1);
-                   shuffled.unshift(currentTrack);
-               }
-          }
-          setQueue(shuffled);
+      if (!currentTrack || queue.length === 0) return;
+      const idx = queue.findIndex(t => t.id === currentTrack.id);
+      if (idx > 0) {
+          playTrack(queue[idx - 1], queue);
       } else {
-          // Restore Logic
-          // Try to map current position to original queue
-          setQueue([...originalQueue]);
+          playTrack(queue[0], queue);
       }
   };
 
-  const handleSearch = async (query: string, category: CategoryFilter = 'ALL') => {
+  const toggleEntitySave = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (view === ViewState.ALBUM_DETAILS && selectedEntity) {
+          storageService.toggleSaveAlbum(selectedEntity);
+      } else if (view === ViewState.ARTIST_DETAILS && selectedEntity) {
+          storageService.toggleFollowArtist(selectedEntity);
+      } else if (view === ViewState.PLAYLIST_DETAILS && selectedEntity) {
+          storageService.savePlaylist(selectedEntity);
+      }
+      refreshLibrary();
+  };
+
+  const isEntitySaved = () => {
+      if (!selectedEntity) return false;
+      if (view === ViewState.ALBUM_DETAILS) return storageService.isAlbumSaved(selectedEntity.id);
+      if (view === ViewState.ARTIST_DETAILS) return storageService.isArtistFollowed(selectedEntity.id);
+      if (view === ViewState.PLAYLIST_DETAILS) return storageService.isPlaylistSaved(selectedEntity.uuid);
+      return false;
+  };
+
+  // --- End Playback Logic ---
+
+  const handleSearch = async (e?: React.FormEvent, override?: string) => {
+    if (e) e.preventDefault();
+    const query = override !== undefined ? override : searchInput;
     if (!query.trim()) return;
-    setIsLoading(true);
+    
     setSearchInput(query);
-    setActiveSearchCategory(category);
-    setVisibleSongsCount(10);
+
+    if (view !== ViewState.SEARCH || currentState.query !== query) {
+        navigateTo({ view: ViewState.SEARCH, query, filter: 'ALL' });
+    }
+
+    storageService.addToHistory(query);
+    refreshLibrary(); 
+    
+    setIsLoading(true);
+    setError(null);
+    setHasSearched(true);
+    setActiveSearchCategory('ALL'); // Reset filter on new search
+    setVisibleSongsCount(10); // Reset pagination
+    
+    setResultTracks([]); setResultAlbums([]); setResultArtists([]); setResultPlaylists([]);
     
     try {
       const results = await searchAll(query);
@@ -402,690 +430,639 @@ const App: React.FC = () => {
       setResultAlbums(results.albums);
       setResultArtists(results.artists);
       setResultPlaylists(results.playlists);
-      setHasSearched(true);
-      
-      navigateTo({ 
-          view: ViewState.SEARCH, 
-          query: query,
-          filter: category
-      });
-      storageService.addToHistory(query);
-      refreshLibrary();
+      updateConnectionStatus();
     } catch (err) {
-      setError("Search failed. Please try again.");
+      setError("Search failed. Trying next instance...");
+      updateConnectionStatus();
     } finally {
       setIsLoading(false);
     }
   };
 
-  // View Handlers
-  const openAlbum = async (albumId: string | number) => {
+  const handleEntityClick = async (type: 'ALBUM' | 'ARTIST' | 'PLAYLIST', item: any) => {
       setIsLoading(true);
+      const loadingState = { ...item };
       try {
-          const tracks = await getAlbumTracks(albumId);
-          // Find album info from search results or saved albums for metadata
-          let albumInfo = resultAlbums.find(a => a.id == albumId) || 
-                          savedAlbums.find(a => a.id == albumId) || 
-                          homeSections.flatMap(s => s.items).find(i => i.id == albumId);
-
-          if (!albumInfo && tracks.length > 0) {
-               albumInfo = tracks[0].album;
-          }
-
-          navigateTo({ 
-              view: ViewState.ALBUM_DETAILS, 
-              entity: albumInfo, 
-              detailTracks: tracks 
-          });
+          let tracks: Track[] = [];
+          let albums: Album[] = [];
+          let viewState = ViewState.HOME;
           
-          if (albumInfo) {
-              storageService.addToRecentlyPlayed({
-                  type: 'ALBUM',
-                  data: albumInfo,
-                  timestamp: Date.now()
-              });
+          if (type === 'ALBUM') {
+              viewState = ViewState.ALBUM_DETAILS;
+              tracks = await getAlbumTracks(item.id);
+              if (tracks.length > 0 && (item.title === 'Loading...' || !item.cover)) {
+                  loadingState.title = tracks[0].album.title;
+                  loadingState.cover = tracks[0].album.cover;
+                  loadingState.artist = tracks[0].artist;
+              }
+          } else if (type === 'ARTIST') {
+              viewState = ViewState.ARTIST_DETAILS;
+              albums = await getArtistAlbums(item.id);
+              if (albums.length > 0 && item.name === 'Loading...') {
+                  loadingState.name = albums[0].artist?.name || item.name;
+              }
+          } else if (type === 'PLAYLIST') {
+              viewState = ViewState.PLAYLIST_DETAILS;
+              tracks = item.isLocal ? (item.tracks || []) : await getPlaylistTracks(item.uuid);
           }
-      } catch (e) { setError("Could not load album."); }
-      finally { setIsLoading(false); }
-  };
-
-  const openArtist = async (artistId: string | number) => {
-      setIsLoading(true);
-      try {
-          const [tracks, albums] = await Promise.all([
-              getArtistTopTracks(artistId),
-              getArtistAlbums(artistId)
-          ]);
-
-          let artistInfo = resultArtists.find(a => a.id == artistId) || 
-                           followedArtists.find(a => a.id == artistId) ||
-                           (tracks.length > 0 ? tracks[0].artist : null);
-
-          navigateTo({ 
-              view: ViewState.ARTIST_DETAILS, 
-              entity: artistInfo, 
-              detailTracks: tracks,
-              detailAlbums: albums
-          });
-
-          if (artistInfo) {
-            storageService.addToRecentlyPlayed({
-                type: 'ARTIST',
-                data: artistInfo,
-                timestamp: Date.now()
-              });
-          }
-      } catch (e) { setError("Could not load artist."); }
-      finally { setIsLoading(false); }
-  };
-
-  const openPlaylist = async (playlist: Playlist) => {
-      if (playlist.isLocal) {
-          // Local playlists have tracks already in memory
-          navigateTo({ 
-              view: ViewState.PLAYLIST_DETAILS, 
-              entity: playlist, 
-              detailTracks: playlist.tracks || []
-          });
-      } else {
-          // Fetch remote playlist
-          setIsLoading(true);
-          try {
-              const tracks = await getPlaylistTracks(playlist.uuid);
-              navigateTo({ 
-                  view: ViewState.PLAYLIST_DETAILS, 
-                  entity: playlist, 
-                  detailTracks: tracks 
-              });
-              
-              storageService.addToRecentlyPlayed({
-                type: 'PLAYLIST',
-                data: playlist,
-                timestamp: Date.now()
-              });
-          } catch (e) { setError("Could not load playlist."); }
-          finally { setIsLoading(false); }
-      }
-  };
-
-  const openLikedSongs = () => {
-      const songs = storageService.getLikedSongs();
-      navigateTo({
-          view: ViewState.LIKED_SONGS,
-          detailTracks: songs
-      });
-  };
-
-  // Library Actions
-  const handleSavePlaylist = (playlist: Playlist) => {
-    storageService.savePlaylist(playlist);
-    refreshLibrary();
-  };
-
-  const handleCreatePlaylist = (title: string, importedTracks: Track[] = []) => {
-      const newPlaylist = storageService.createPlaylist(title);
-      if (importedTracks.length > 0) {
-          storageService.updatePlaylistTracks(newPlaylist.uuid, importedTracks);
-      }
-      refreshLibrary();
-      // Open new playlist
-      openPlaylist({ ...newPlaylist, tracks: importedTracks });
-  };
-
-  const handlePlaylistUpdate = (uuid: string, updates: { title: string, description: string, image: string }, tracks: Track[]) => {
-      storageService.updatePlaylist(uuid, updates);
-      storageService.updatePlaylistTracks(uuid, tracks);
-      
-      // Update local view state if we are viewing this playlist
-      if (view === ViewState.PLAYLIST_DETAILS && selectedEntity.uuid === uuid) {
-           const updatedPlaylist = storageService.getPlaylists().find(p => p.uuid === uuid);
-           if (updatedPlaylist) {
-               navigateTo({
-                   view: ViewState.PLAYLIST_DETAILS,
-                   entity: updatedPlaylist,
-                   detailTracks: tracks
-               });
-           }
-      }
-      refreshLibrary();
-  };
-
-  const handleDeletePlaylist = (uuid: string) => {
-      storageService.deletePlaylist(uuid);
-      refreshLibrary();
-      if (view === ViewState.PLAYLIST_DETAILS && selectedEntity.uuid === uuid) {
-          goBack();
-      }
-  };
-
-  // Download Logic
-  const handleDownloadTrack = async () => {
-      if (!currentTrack) return;
-      try {
-          const filename = `${currentTrack.artist.name} - ${currentTrack.title}.flac`;
-          setSingleDownloadState({ name: currentTrack.title, progress: 0 });
           
-          let downloadUrl = currentTrack.streamUrl;
-          if (!downloadUrl) {
-              downloadUrl = await getStreamUrl(currentTrack);
-          }
-
-          const blob = await downloadBlobWithProgress(downloadUrl, (p) => {
-              setSingleDownloadState(prev => prev ? { ...prev, progress: p } : null);
+          storageService.addToRecentlyPlayed({ 
+            type: type as any, 
+            data: loadingState, 
+            timestamp: Date.now() 
           });
-          
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
+          refreshLibrary();
+
+          navigateTo({ view: viewState, entity: loadingState, detailTracks: tracks, detailAlbums: albums });
+
       } catch (e) {
-          console.error("Download failed", e);
-          setError("Download failed.");
+          setError("Failed to load details");
       } finally {
-          setTimeout(() => setSingleDownloadState(null), 2000);
+          setIsLoading(false);
       }
   };
 
-  const handleDownloadZip = async (name: string, tracks: Track[]) => {
-    if (isExporting) return;
-    setIsExporting(true);
-    setZipDownloadState({ name: name, progress: 0 });
-
-    const zip = new JSZip();
-    let completed = 0;
-
-    // Chunk size to prevent memory issues/rate limits
-    const CHUNK_SIZE = 3;
-    
-    try {
-        for (let i = 0; i < tracks.length; i += CHUNK_SIZE) {
-            const chunk = tracks.slice(i, i + CHUNK_SIZE);
-            await Promise.all(chunk.map(async (track) => {
-                try {
-                    const url = await getStreamUrl(track);
-                    const blob = await downloadTrackBlob(url);
-                    const fileName = `${track.artist.name} - ${track.title}.flac`.replace(/[\/\?<>\\:\*\|":]/g, '');
-                    zip.file(fileName, blob);
-                } catch (e) {
-                    console.error(`Failed to download ${track.title}`, e);
-                    zip.file(`FAILED_${track.title}.txt`, "Download failed");
-                } finally {
-                    completed++;
-                    const percent = Math.round((completed / tracks.length) * 100);
-                    setExportProgress(percent);
-                    setZipDownloadState({ name, progress: percent });
-                }
-            }));
-        }
-
-        const content = await zip.generateAsync({ type: 'blob' });
-        const url = window.URL.createObjectURL(content);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${name}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-
-    } catch (e) {
-        setError("Batch download failed.");
-    } finally {
-        setIsExporting(false);
-        setExportProgress(0);
-        setTimeout(() => setZipDownloadState(null), 2000);
-    }
+  const handleArtistClick = (artistId: number | string) => {
+      const dummyArtist = { id: artistId, name: 'Loading...', picture: '' };
+      handleEntityClick('ARTIST', dummyArtist);
   };
 
-  // CSV Export Logic
-  const handleExportCsv = (name: string, tracks: Track[]) => {
-      const headers = ['Title', 'Artist', 'Album', 'Duration (s)', 'Stream URL'];
-      const rows = tracks.map(t => [
-          `"${t.title.replace(/"/g, '""')}"`,
-          `"${t.artist.name.replace(/"/g, '""')}"`,
-          `"${t.album.title.replace(/"/g, '""')}"`,
-          t.duration,
-          `"${t.streamUrl || ''}"`
-      ]);
+  const handleAlbumClick = (albumId: number | string) => {
+      const dummyAlbum = { id: albumId, title: 'Loading...', cover: '' };
+      handleEntityClick('ALBUM', dummyAlbum);
+  };
+
+  const handleExportCSV = async () => {
+      if (!detailTracks.length) return;
+      setIsExporting(true);
+      setExportProgress(0);
+
+      const rows = [['Title', 'Artist', 'Album', 'Duration', 'Stream URL']];
       
-      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${name}.csv`);
+      for (let i = 0; i < detailTracks.length; i++) {
+          const t = detailTracks[i];
+          let url = 'N/A';
+          try {
+              url = await getStreamUrl(t.id);
+          } catch (e) {
+              url = `Failed to resolve: ${t.id}`;
+          }
+          rows.push([
+              `"${t.title.replace(/"/g, '""')}"`,
+              `"${t.artist.name.replace(/"/g, '""')}"`,
+              `"${t.album.title.replace(/"/g, '""')}"`,
+              `${t.duration}`,
+              url
+          ]);
+          setExportProgress(Math.round(((i + 1) / detailTracks.length) * 100));
+      }
+
+      const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `${selectedEntity?.title || 'playlist'}_export.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-  };
-
-  // Sorting Logic
-  const getSortedTracks = (tracks: Track[]) => {
-      if (sortOption === 'CUSTOM') return tracks;
-      return [...tracks].sort((a, b) => {
-          switch(sortOption) {
-              case 'TITLE': return a.title.localeCompare(b.title);
-              case 'ARTIST': return a.artist.name.localeCompare(b.artist.name);
-              case 'ALBUM': return a.album.title.localeCompare(b.album.title);
-              case 'DURATION': return a.duration - b.duration;
-              default: return 0;
-          }
-      });
-  };
-
-  return (
-    <div className={`h-screen flex flex-col bg-black text-white overflow-hidden ${reducedMotion ? 'motion-reduce' : ''} ${grayscaleMode ? 'grayscale' : ''}`}>
       
-      {/* Top Mobile Bar (Fixed) */}
-      <div className="md:hidden h-14 bg-black/90 backdrop-blur-md flex items-center justify-between px-4 sticky top-0 z-40 border-b border-[#282828]">
-          <div className="font-bold text-xl tracking-tight">SpoFree</div>
-          <div className="flex gap-4 items-center">
-               <button onClick={() => setShowImportModal(true)} className="p-1"><Plus size={24} /></button>
-               <button onClick={() => { setSettingsStartTab('TWEAKS'); setShowSettingsModal(true); }} className="p-1"><Settings size={20} /></button>
+      setIsExporting(false);
+  };
+
+  const handleDownloadZip = async () => {
+      if (!detailTracks.length) return;
+      const folderName = (selectedEntity?.title || 'album').replace(/[^a-z0-9]/gi, '_');
+      setZipDownloadState({ name: folderName, progress: 0 });
+
+      (async () => {
+        try {
+            const zip = new JSZip();
+            const folder = zip.folder(folderName);
+  
+            for (let i = 0; i < detailTracks.length; i++) {
+                const t = detailTracks[i];
+                try {
+                    const url = await getStreamUrl(t.id);
+                    const blob = await downloadTrackBlob(url);
+                    const ext = blob.type.includes('flac') ? 'flac' : 'm4a';
+                    const filename = `${i+1}. ${t.title} - ${t.artist.name}.${ext}`.replace(/[\/\\:*?"<>|]/g, '');
+                    
+                    folder?.file(filename, blob);
+                } catch (e) {
+                    console.error(`Failed to download ${t.title}`, e);
+                    folder?.file(`${i+1}. ${t.title}_ERROR.txt`, "Failed to download");
+                }
+                setZipDownloadState({ name: folderName, progress: Math.round(((i + 1) / detailTracks.length) * 100) });
+            }
+  
+            const content = await zip.generateAsync({ type: "blob" });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `${folderName}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+  
+        } catch (e) {
+            setError("Failed to generate ZIP file.");
+        } finally {
+            setZipDownloadState(null);
+        }
+      })();
+  };
+  
+  const handleDownloadTrack = async () => {
+    if (!currentTrack) return;
+    setSingleDownloadState({ name: currentTrack.title, progress: 0 });
+    
+    try {
+        const url = await getStreamUrl(currentTrack.id);
+        const blob = await downloadBlobWithProgress(url, (p) => {
+             setSingleDownloadState(prev => prev ? { ...prev, progress: p } : null);
+        });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        const ext = blob.type === 'audio/flac' ? 'flac' : 'm4a';
+        link.download = `${currentTrack.title} - ${currentTrack.artist.name}.${ext}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (e) {
+        setError("Failed to download track.");
+    } finally {
+        setSingleDownloadState(null);
+    }
+  };
+
+  const handleSaveQueueAsPlaylist = () => {
+      if (queue.length === 0) return;
+      const title = `Queue - ${new Date().toLocaleDateString()}`;
+      const p = storageService.createPlaylist(title);
+      queue.forEach(t => storageService.addTrackToPlaylist(p.uuid, t));
+      refreshLibrary();
+      alert(`Queue saved as playlist "${title}"`);
+  };
+
+  const MediaGrid = ({ title, items, type }: any) => {
+     if (!items?.length) return null;
+     return (
+        <div className="mb-8 animate-fade-in">
+           <h2 className="text-2xl font-bold mb-4">{title}</h2>
+           <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {items.map((item: any, idx: number) => (
+                 <div key={idx} onClick={() => handleEntityClick(type.toUpperCase(), item)}
+                    className="bg-[#181818] p-4 rounded-md hover:bg-[#282828] cursor-pointer group transition-colors">
+                    <img src={type === 'artist' ? item.picture : (type === 'playlist' ? item.image : item.cover)} 
+                         className={`w-full aspect-square object-cover shadow-lg mb-4 ${type === 'artist' && !squareAvatars ? 'rounded-full' : 'rounded-md'}`} />
+                    <h3 className="font-bold truncate mb-1">{item.title || item.name}</h3>
+                    <p className="text-sm text-[#b3b3b3] truncate">{type === 'album' ? item.artist.name : (type === 'playlist' ? item.creator.name : 'Artist')}</p>
+                 </div>
+              ))}
+           </div>
+        </div>
+     );
+  };
+  
+  const LibraryItem = ({ item, type, onClick, subtitle }: any) => {
+      if (libraryViewMode === 'LIST') {
+          return (
+              <div onClick={onClick} className="flex items-center gap-3 p-2 hover:bg-[#282828] rounded-md cursor-pointer group animate-fade-in">
+                  <img src={item.image || item.cover || item.picture} className={`w-12 h-12 object-cover shadow-sm ${type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'}`} />
+                  <div className="flex-1 min-w-0">
+                      <h3 className="font-bold truncate text-white text-sm">{item.title || item.name}</h3>
+                      <p className="text-xs text-[#b3b3b3] truncate">{subtitle}</p>
+                  </div>
+              </div>
+          )
+      }
+      // GRID
+      return (
+        <div onClick={onClick} className="bg-[#181818] p-4 rounded-md hover:bg-[#282828] cursor-pointer group transition-colors animate-fade-in">
+            <img src={item.image || item.cover || item.picture} className={`w-full aspect-square object-cover shadow-lg mb-4 ${type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'}`} />
+            <h3 className="font-bold truncate mb-1">{item.title || item.name}</h3>
+            <p className="text-sm text-[#b3b3b3] truncate">{subtitle}</p>
+        </div>
+      )
+  };
+
+  const LibraryCollection = ({ items, type, emptyMessage }: any) => {
+      if (items.length === 0) return <div className="text-[#b3b3b3] p-4">{emptyMessage}</div>;
+      
+      const containerClass = libraryViewMode === 'GRID' 
+        ? "grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+        : "flex flex-col gap-1";
+
+      return (
+          <div className={`${containerClass} animate-slide-up`}>
+              {items.map((item: any) => {
+                   let subtitle = '';
+                   let clickHandler = () => {};
+                   
+                   if (type === 'PLAYLIST') {
+                       subtitle = `By ${item.creator.name}`;
+                       clickHandler = () => handleEntityClick('PLAYLIST', item);
+                   } else if (type === 'ALBUM') {
+                       subtitle = item.artist.name;
+                       clickHandler = () => handleEntityClick('ALBUM', item);
+                   } else if (type === 'ARTIST') {
+                       subtitle = 'Artist';
+                       clickHandler = () => handleEntityClick('ARTIST', item);
+                   } else if (type === 'LIKED_SONGS') {
+                       subtitle = `${item.count} songs`;
+                       clickHandler = () => {
+                           refreshLibrary(); 
+                           const tracks = storageService.getLikedSongs();
+                           const entity = { title: 'Liked Songs', cover: 'https://misc.scdn.co/liked-songs/liked-songs-640.png', artist: { name: 'You' } };
+                           navigateTo({ view: ViewState.LIKED_SONGS, entity, detailTracks: tracks });
+                       };
+                   }
+
+                   return (
+                       <LibraryItem 
+                            key={item.uuid || item.id} 
+                            item={item} 
+                            type={type} 
+                            onClick={clickHandler}
+                            subtitle={subtitle}
+                        />
+                   );
+              })}
           </div>
-      </div>
+      );
+  };
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Desktop Sidebar */}
-        <Sidebar 
-            currentView={view} 
-            onChangeView={(v) => navigateTo({ view: v })}
-            playlists={playlists}
-            onPlaylistClick={openPlaylist}
-            onCreatePlaylist={() => setShowImportModal(true)}
-            onLikedSongsClick={openLikedSongs}
-            onOpenSettings={() => { setSettingsStartTab('QUALITY'); setShowSettingsModal(true); }}
-        />
+  const getSortedTracks = (tracks: Track[]) => {
+      const copy = [...tracks];
+      switch(sortOption) {
+          case 'TITLE': return copy.sort((a, b) => a.title.localeCompare(b.title));
+          case 'ARTIST': return copy.sort((a, b) => a.artist.name.localeCompare(b.artist.name));
+          case 'ALBUM': return copy.sort((a, b) => a.album.title.localeCompare(b.album.title));
+          case 'DURATION': return copy.sort((a, b) => a.duration - b.duration);
+          default: return copy;
+      }
+  };
 
-        {/* Main Content Area */}
-        <main ref={mainContentRef} className="flex-1 bg-[#121212] relative overflow-y-auto w-full md:rounded-lg md:my-2 md:mr-2 no-scrollbar scroll-smooth pb-40 md:pb-32">
-            {/* Header / Nav Bar */}
-            <header className={`sticky top-0 z-20 flex justify-between items-center px-4 md:px-8 py-4 transition-colors duration-300 ${isScrolled ? 'bg-[#121212]/95 backdrop-blur-md shadow-lg' : 'bg-transparent'}`}>
-                <div className="flex items-center gap-4">
-                    <div className="hidden md:flex gap-2">
-                        <button onClick={goBack} disabled={historyIndex <= 0} className="bg-black/50 p-1.5 rounded-full disabled:opacity-30 hover:bg-black/70"><ChevronLeft /></button>
-                        <button onClick={goForward} disabled={historyIndex >= historyStack.length - 1} className="bg-black/50 p-1.5 rounded-full disabled:opacity-30 hover:bg-black/70"><ChevronRight /></button>
-                    </div>
-                    {view === ViewState.SEARCH && (
-                         <div className="relative group">
-                            <Search className="absolute left-3 top-2.5 text-[#b3b3b3] group-focus-within:text-white" size={20} />
-                            <input 
-                                className="bg-[#282828] rounded-full py-2.5 pl-10 pr-4 w-full md:w-80 text-sm placeholder-[#b3b3b3] text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
-                                placeholder="What do you want to listen to?"
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleSearch(searchInput)}
-                                autoFocus
-                            />
-                         </div>
-                    )}
-                </div>
+  const renderDetailsHeader = (type: string, title: string, subtitle: string, image: string, isSaved: boolean) => (
+    <div className="flex flex-col md:flex-row gap-6 mb-8 items-center md:items-end animate-slide-up">
+        <img src={image} className={`w-48 h-48 md:w-56 md:h-56 shadow-2xl ${type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'} object-cover`} />
+        <div className="flex flex-col gap-4 text-center md:text-left flex-1 min-w-0">
+            <span className="text-sm font-bold uppercase tracking-wider">{type === 'LIKED_SONGS' ? 'Playlist' : type}</span>
+            <div className="flex flex-col">
+                <h1 className="text-4xl md:text-6xl font-bold tracking-tight break-words">{title}</h1>
+                {selectedEntity?.description && type === 'PLAYLIST' && (
+                    <p className="text-[#b3b3b3] mt-2 text-sm max-w-2xl">{selectedEntity.description}</p>
+                )}
+            </div>
+            <div className="flex items-center justify-center md:justify-start gap-2 text-sm text-[#b3b3b3]">
+                {type !== 'ARTIST' && <span>{subtitle}</span>}
+                {type === 'PLAYLIST' && <span>• {detailTracks.length} songs</span>}
+            </div>
+            <div className="flex items-center justify-center md:justify-start gap-4 mt-2 flex-wrap">
+                <button 
+                    onClick={() => detailTracks.length > 0 && playTrack(detailTracks[0], detailTracks)}
+                    className="w-14 h-14 rounded-full bg-[#1db954] hover:scale-105 transition-transform flex items-center justify-center shadow-lg flex-shrink-0"
+                    style={{ backgroundColor: accentColor }}
+                >
+                    <div className="ml-1 w-0 h-0 border-t-[10px] border-t-transparent border-l-[16px] border-l-black border-b-[10px] border-b-transparent"></div>
+                </button>
+                {type !== 'LIKED_SONGS' && (
+                    <button 
+                        onClick={toggleEntitySave} 
+                        className={`p-2 rounded-full border-2 transition-colors ${isSaved ? 'border-green-500 text-green-500' : 'border-[#b3b3b3] text-[#b3b3b3] hover:border-white hover:text-white'}`}
+                    >
+                        <Heart size={24} fill={isSaved ? "currentColor" : "none"} />
+                    </button>
+                )}
+                {type === 'PLAYLIST' && selectedEntity?.isLocal && (
+                    <button onClick={() => setShowPlaylistEditModal(true)} className="text-[#b3b3b3] hover:text-white p-2">
+                        <Pencil size={24} />
+                    </button>
+                )}
                 
-                {/* Desktop Top Right Actions */}
-                <div className="hidden md:flex items-center gap-4">
-                    {/* View specific actions */}
-                    {view === ViewState.LIBRARY && (
-                         <div className="flex gap-2">
-                             <button onClick={() => setLibraryViewMode('GRID')} className={`p-2 rounded-full ${libraryViewMode === 'GRID' ? 'bg-white/10 text-white' : 'text-[#b3b3b3]'}`}><LayoutGrid size={18} /></button>
-                             <button onClick={() => setLibraryViewMode('LIST')} className={`p-2 rounded-full ${libraryViewMode === 'LIST' ? 'bg-white/10 text-white' : 'text-[#b3b3b3]'}`}><List size={18} /></button>
-                         </div>
-                    )}
-                </div>
-            </header>
-
-            {/* Content Views */}
-            <div className="px-4 md:px-8 pb-8 min-h-full">
-                {error && (
-                    <div className="bg-red-500/10 text-red-500 p-4 rounded-md mb-6 flex justify-between items-center animate-fade-in">
-                        <span>{error}</span>
-                        <button onClick={() => setError(null)}><X size={18} /></button>
+                {/* Playlist Sort Dropdown */}
+                {type === 'PLAYLIST' && (
+                    <div className="relative">
+                         <button 
+                            onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
+                            className={`p-2 hover:text-white transition-colors flex items-center gap-1 ${sortOption !== 'CUSTOM' ? 'text-green-500' : 'text-[#b3b3b3]'}`}
+                        >
+                            <span className="text-sm font-medium hidden md:block">Sort</span>
+                            <ArrowDownUp size={20} />
+                         </button>
+                         {isSortDropdownOpen && (
+                             <div className="absolute top-full left-0 mt-2 bg-[#282828] rounded shadow-xl z-50 py-1 w-40 border border-[#3e3e3e]">
+                                 {(['CUSTOM', 'TITLE', 'ARTIST', 'ALBUM', 'DURATION'] as SortOption[]).map(opt => (
+                                     <button 
+                                        key={opt}
+                                        onClick={() => { setSortOption(opt); setIsSortDropdownOpen(false); }}
+                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-[#3e3e3e] ${sortOption === opt ? 'text-green-500' : 'text-white'}`}
+                                     >
+                                         {opt.charAt(0) + opt.slice(1).toLowerCase()}
+                                     </button>
+                                 ))}
+                             </div>
+                         )}
                     </div>
                 )}
 
-                {/* HOME VIEW */}
-                {view === ViewState.HOME && (
-                    <div className="animate-fade-in space-y-8 pt-4">
-                        <h1 className="text-3xl md:text-4xl font-bold mb-6">What do you want to listen to?</h1>
+                {/* Export Actions */}
+                <div className="flex gap-2 ml-2">
+                    <button 
+                        onClick={handleExportCSV} 
+                        disabled={isExporting}
+                        className="p-2 text-[#b3b3b3] hover:text-white disabled:opacity-50"
+                        title="Export as CSV"
+                    >
+                        {isExporting ? <Loader2 className="animate-spin" size={24} /> : <CsvFileIcon size={24} />}
+                    </button>
+                    <button 
+                        onClick={handleDownloadZip}
+                        disabled={!!zipDownloadState}
+                        className="p-2 text-[#b3b3b3] hover:text-white disabled:opacity-50"
+                        title="Download as ZIP"
+                    >
+                        {zipDownloadState ? <Loader2 className="animate-spin" size={24} /> : <Archive size={24} />}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+  );
+
+  return (
+    <div className="h-screen w-screen flex flex-col md:flex-row overflow-hidden bg-black text-white" style={{ filter: grayscaleMode ? 'grayscale(100%)' : 'none' }}>
+      <Sidebar 
+        currentView={view} 
+        onChangeView={(v) => { refreshLibrary(); navigateTo({ view: v }); }} 
+        playlists={playlists}
+        onPlaylistClick={(p) => handleEntityClick('PLAYLIST', p)}
+        onCreatePlaylist={() => setShowImportModal(true)}
+        onLikedSongsClick={() => { 
+            refreshLibrary(); 
+            const tracks = storageService.getLikedSongs();
+            const entity = { title: 'Liked Songs', cover: 'https://misc.scdn.co/liked-songs/liked-songs-640.png', artist: { name: 'You' } };
+            navigateTo({ view: ViewState.LIKED_SONGS, entity, detailTracks: tracks });
+        }}
+        onOpenSettings={() => { setSettingsStartTab('QUALITY'); setShowSettingsModal(true); }}
+      />
+
+      <div className="flex-1 flex flex-col relative rounded-none md:rounded-lg ml-0 md:ml-2 mt-0 md:mt-2 mr-0 md:mr-2 mb-20 md:mb-2 bg-[#121212] overflow-hidden">
+        {/* Mobile Nav */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 h-[56px] box-content bg-[#121212] border-t border-[#282828] flex justify-around items-center z-50 pb-safe">
+             <button onClick={() => navigateTo({ view: ViewState.HOME })} className={`flex flex-col items-center ${view === ViewState.HOME ? 'text-white' : 'text-[#b3b3b3]'}`}><Home size={24}/><span className="text-[10px]">Home</span></button>
+             <button onClick={() => navigateTo({ view: ViewState.SEARCH })} className={`flex flex-col items-center ${view === ViewState.SEARCH ? 'text-white' : 'text-[#b3b3b3]'}`}><Search size={24}/><span className="text-[10px]">Search</span></button>
+             <button onClick={() => { refreshLibrary(); navigateTo({ view: ViewState.LIBRARY }); }} className={`flex flex-col items-center ${view === ViewState.LIBRARY ? 'text-white' : 'text-[#b3b3b3]'}`}><Library size={24}/><span className="text-[10px]">Library</span></button>
+             <button onClick={() => { setSettingsStartTab('QUALITY'); setShowSettingsModal(true); }} className="flex flex-col items-center text-[#b3b3b3] hover:text-white"><Settings size={24}/><span className="text-[10px]">Settings</span></button>
+        </div>
+
+        {/* Top Bar with Dynamic Background */}
+        <div className={`h-16 w-full flex items-center justify-between px-4 md:px-6 z-20 absolute top-0 transition-colors duration-300 ${isScrolled || view === ViewState.SEARCH ? (highPerformanceMode ? 'bg-[#121212]' : 'bg-[#121212]/95 backdrop-blur-md') : 'bg-transparent'}`}>
+          <div className="flex gap-4 items-center w-full md:w-auto">
+             <div className="hidden md:flex gap-2">
+                 <button onClick={goBack} disabled={historyIndex === 0} className="bg-black/70 rounded-full p-1 disabled:opacity-30"><ChevronLeft size={22} color="white"/></button>
+                 <button onClick={goForward} disabled={historyIndex === historyStack.length - 1} className="bg-black/70 rounded-full p-1 disabled:opacity-30"><ChevronRight size={22} color="white"/></button>
+             </div>
+             {view === ViewState.SEARCH && (
+                <form onSubmit={(e) => handleSearch(e)} className="relative flex-1 md:w-80">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <input className="h-10 w-full rounded-full pl-10 pr-4 bg-[#242424] text-sm text-white focus:outline-none" 
+                           placeholder="Songs, Artists, Albums..." 
+                           value={searchInput}
+                           onChange={(e) => setSearchInput(e.target.value)}
+                           autoFocus />
+                </form>
+             )}
+          </div>
+          <div className="hidden md:flex items-center gap-4">
+            <Button variant="secondary" size="sm" onClick={() => window.open('https://github.com/redretep/spofree/tree/main', '_blank')} className="flex items-center gap-2">
+                <Github size={16} /><span>GitHub</span>
+            </Button>
+          </div>
+        </div>
+        
+        <div className="flex flex-1 overflow-hidden">
+            {/* Main Content Area */}
+            {/* key={view} forces a re-mount to trigger animation when switching tabs */}
+            <div className="flex-1 overflow-y-auto bg-[#121212]" ref={mainContentRef} key={view}>
+            <div className="h-16"></div>
+            <div className="px-4 md:px-6 pb-40 animate-fade-in">
+                {error && <div className="bg-red-500/20 text-red-100 p-4 rounded mb-6 text-sm">{error}</div>}
+
+                {view === ViewState.HOME && !isLoading && (
+                    <div>
+                        <h1 className="text-3xl font-bold mb-6">What do you want to listen to?</h1>
                         
-                        {/* Recently Played */}
                         {recentlyPlayed.length > 0 && (
-                            <section>
+                            <div className="mb-8">
                                 <h2 className="text-xl font-bold mb-4">Recently Played</h2>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                                    {recentlyPlayed.slice(0, 6).map((item, i) => (
-                                        <div 
-                                            key={i} 
-                                            onClick={() => {
-                                                if(item.type === 'TRACK') handlePlayTrack(item.data as Track);
-                                                if(item.type === 'ALBUM') openAlbum((item.data as Album).id);
-                                                if(item.type === 'ARTIST') openArtist((item.data as Artist).id);
-                                                if(item.type === 'PLAYLIST') openPlaylist(item.data as Playlist);
-                                            }}
-                                            className="bg-[#2a2a2a]/40 hover:bg-[#2a2a2a] transition-colors rounded-md overflow-hidden flex items-center group cursor-pointer h-16 md:h-20"
-                                        >
-                                            <img src={(item.data as any).cover || (item.data as any).image || (item.data as any).picture || (item.data as any).album?.cover} className="h-full aspect-square object-cover" />
-                                            <div className="px-4 flex-1 min-w-0">
-                                                <div className="font-bold text-sm truncate">{(item.data as any).title || (item.data as any).name}</div>
-                                                <div className="text-xs text-[#b3b3b3]">{item.type.charAt(0) + item.type.slice(1).toLowerCase()}</div>
-                                            </div>
-                                            <div className="pr-4 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
-                                                <div className="bg-[#1db954] rounded-full p-2"><Play size={16} fill="black" className="ml-0.5" /></div>
-                                            </div>
+                                <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                                    {recentlyPlayed.map((item, i) => (
+                                        <div key={i} 
+                                            onClick={() => item.type === 'TRACK' ? playTrack(item.data as Track) : handleEntityClick(item.type, item.data)}
+                                            className="bg-[#181818] p-4 rounded-md hover:bg-[#282828] cursor-pointer group transition-colors">
+                                            <img src={
+                                                item.type === 'TRACK' ? (item.data as Track).album.cover :
+                                                item.type === 'ALBUM' ? (item.data as Album).cover :
+                                                item.type === 'ARTIST' ? (item.data as Artist).picture :
+                                                (item.data as Playlist).image
+                                            } className={`w-full aspect-square object-cover shadow-lg mb-4 ${item.type === 'ARTIST' && !squareAvatars ? 'rounded-full' : 'rounded-md'}`} />
+                                            <h3 className="font-bold truncate mb-1">{(item.data as any).title || (item.data as any).name}</h3>
                                         </div>
                                     ))}
                                 </div>
-                            </section>
+                            </div>
                         )}
 
-                        {/* Recommendation Sections */}
+                        {/* Home Recommendations Sections */}
                         {homeSections.map((section, idx) => (
                             <MediaGrid 
                                 key={idx}
                                 title={section.title}
                                 items={section.items}
-                                type={section.type}
-                                onItemClick={(item) => section.type === 'ARTIST' ? openArtist(item.id) : section.type === 'ALBUM' ? openAlbum(item.id) : openPlaylist(item)}
-                                grayscaleMode={grayscaleMode}
-                                squareAvatars={squareAvatars}
+                                type={section.type.toLowerCase()}
                             />
                         ))}
-                    </div>
-                )}
 
-                {/* SEARCH VIEW */}
-                {view === ViewState.SEARCH && hasSearched && (
-                    <div className="animate-fade-in space-y-8">
-                        {/* Filters */}
-                        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar sticky top-16 z-10 bg-[#121212] pt-2">
-                             {['ALL', 'TRACKS', 'ALBUMS', 'ARTISTS', 'PLAYLISTS'].map(cat => (
-                                 <button
-                                    key={cat}
-                                    onClick={() => handleSearch(currentState.query!, cat as CategoryFilter)}
-                                    className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${activeSearchCategory === cat ? 'bg-white text-black' : 'bg-[#282828] text-white hover:bg-[#333]'}`}
-                                 >
-                                     {cat.charAt(0) + cat.slice(1).toLowerCase()}
-                                 </button>
-                             ))}
-                        </div>
-
-                        {/* Results */}
-                        {(activeSearchCategory === 'ALL' || activeSearchCategory === 'TRACKS') && resultTracks.length > 0 && (
-                            <section>
-                                <h2 className="text-xl font-bold">Songs</h2>
-                                <TrackList 
-                                    tracks={resultTracks.slice(0, visibleSongsCount)} 
-                                    onPlay={(t) => handlePlayTrack(t, resultTracks)}
-                                    currentTrackId={currentTrack?.id}
-                                    onArtistClick={openArtist}
-                                    onAlbumClick={openAlbum}
-                                    onAddToPlaylist={(t) => setTrackToAdd(t)}
-                                    accentColor={accentColor}
-                                    compactMode={compactMode}
-                                />
-                                {resultTracks.length > visibleSongsCount && (
-                                    <button 
-                                        onClick={() => setVisibleSongsCount(prev => prev + 10)}
-                                        className="mt-4 text-sm font-bold text-[#b3b3b3] hover:text-white uppercase tracking-widest px-4 py-2"
-                                    >
-                                        Load More
-                                    </button>
-                                )}
-                            </section>
-                        )}
-                        
-                        {(activeSearchCategory === 'ALL' || activeSearchCategory === 'ARTISTS') && resultArtists.length > 0 && (
-                            <MediaGrid 
-                                title="Artists" 
-                                items={resultArtists} 
-                                type="ARTIST" 
-                                onItemClick={(item) => openArtist(item.id)}
-                                grayscaleMode={grayscaleMode}
-                                squareAvatars={squareAvatars}
-                            />
-                        )}
-                        
-                        {(activeSearchCategory === 'ALL' || activeSearchCategory === 'ALBUMS') && resultAlbums.length > 0 && (
-                            <MediaGrid 
-                                title="Albums" 
-                                items={resultAlbums} 
-                                type="ALBUM" 
-                                onItemClick={(item) => openAlbum(item.id)}
-                                grayscaleMode={grayscaleMode}
-                                squareAvatars={squareAvatars}
-                            />
-                        )}
-
-                        {(activeSearchCategory === 'ALL' || activeSearchCategory === 'PLAYLISTS') && resultPlaylists.length > 0 && (
-                            <MediaGrid 
-                                title="Playlists" 
-                                items={resultPlaylists} 
-                                type="PLAYLIST" 
-                                onItemClick={(item) => openPlaylist(item)}
-                                grayscaleMode={grayscaleMode}
-                                squareAvatars={squareAvatars}
-                            />
-                        )}
-                        
-                        {!resultTracks.length && !resultAlbums.length && !resultArtists.length && !isLoading && (
-                            <div className="text-center py-20">
-                                <h3 className="text-2xl font-bold">No results found for "{currentState.query}"</h3>
-                                <p className="text-[#b3b3b3] mt-2">Please check your spelling or try different keywords.</p>
-                            </div>
+                        {recentlyPlayed.length === 0 && homeSections.length === 0 && (
+                            <div className="text-[#b3b3b3] text-sm mt-8">Loading recommendations...</div>
                         )}
                     </div>
                 )}
                 
-                {view === ViewState.SEARCH && !hasSearched && (
-                    <div className="animate-fade-in">
-                        <h2 className="text-xl font-bold mb-4">Browse All</h2>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                            {GENRES.map((genre) => (
-                                <GenreCard 
-                                    key={genre.name}
-                                    genre={genre.name}
-                                    color={genre.color}
-                                    onClick={() => handleSearch(genre.name)}
-                                />
-                            ))}
+                {view === ViewState.LIBRARY && (
+                    <div>
+                        <div className="flex items-center justify-between gap-4 mb-6">
+                            <h1 className="text-3xl font-bold">Your Library</h1>
+                             {/* View Toggle */}
+                            <div className="flex items-center gap-2 bg-[#282828] p-1 rounded-lg">
+                                <button onClick={() => setLibraryViewMode('GRID')} className={`p-1.5 rounded transition-colors ${libraryViewMode === 'GRID' ? 'bg-[#3e3e3e] text-white' : 'text-[#b3b3b3] hover:text-white'}`}><LayoutGrid size={16} /></button>
+                                <button onClick={() => setLibraryViewMode('LIST')} className={`p-1.5 rounded transition-colors ${libraryViewMode === 'LIST' ? 'bg-[#3e3e3e] text-white' : 'text-[#b3b3b3] hover:text-white'}`}><List size={16} /></button>
+                            </div>
                         </div>
                         
-                        {searchHistory.length > 0 && (
-                            <div className="mt-10">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-lg font-bold">Recent Searches</h2>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    {searchHistory.map((term, i) => (
-                                        <div key={i} className="flex justify-between items-center p-2 hover:bg-white/5 rounded group cursor-pointer" onClick={() => handleSearch(term)}>
-                                            <span className="text-[#b3b3b3] group-hover:text-white">{term}</span>
-                                            <button className="opacity-0 group-hover:opacity-100 p-1 hover:text-white text-[#b3b3b3]"><X size={16}/></button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* LIBRARY VIEW */}
-                {view === ViewState.LIBRARY && (
-                    <div className="animate-fade-in">
-                        <div className="flex items-center gap-2 mb-6 overflow-x-auto no-scrollbar">
-                            {['ALL', 'PLAYLISTS', 'LIKED_SONGS', 'ALBUMS', 'ARTISTS'].map(tab => (
-                                <button
+                        {/* Library Tabs */}
+                        <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar">
+                            {(['ALL', 'PLAYLISTS', 'LIKED_SONGS', 'ALBUMS', 'ARTISTS'] as LibraryTab[]).map(tab => (
+                                <button 
                                     key={tab}
-                                    onClick={() => setLibraryTab(tab as LibraryTab)}
-                                    className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${libraryTab === tab ? 'bg-white text-black' : 'bg-[#282828] text-white hover:bg-[#333]'}`}
+                                    onClick={() => setLibraryTab(tab)} 
+                                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${libraryTab === tab ? 'bg-white text-black' : 'bg-[#2a2a2a] text-white hover:bg-[#3e3e3e]'}`}
                                 >
-                                    {tab.replace('_', ' ')}
+                                    {tab === 'ALL' ? 'All' : tab.charAt(0) + tab.slice(1).toLowerCase().replace('_', ' ')}
                                 </button>
                             ))}
                         </div>
 
-                        {(libraryTab === 'ALL' || libraryTab === 'LIKED_SONGS') && likedSongs.length > 0 && (
-                             <div className="mb-8 cursor-pointer group" onClick={openLikedSongs}>
-                                 <div className="bg-gradient-to-br from-indigo-700 to-blue-500 rounded-md p-6 h-48 md:h-60 flex flex-col justify-end relative overflow-hidden">
-                                     <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors"></div>
-                                     <h2 className="text-3xl font-bold relative z-10">Liked Songs</h2>
-                                     <p className="text-white/80 relative z-10">{likedSongs.length} liked songs</p>
-                                     <div className="absolute bottom-4 right-4 bg-[#1db954] rounded-full p-4 shadow-xl translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-                                         <Play size={24} fill="black" className="ml-1" />
-                                     </div>
-                                 </div>
-                             </div>
-                        )}
-
-                        {(libraryTab === 'ALL' || libraryTab === 'PLAYLISTS') && (
-                            <MediaGrid 
-                                title="Your Playlists" 
-                                items={playlists} 
-                                type="PLAYLIST" 
-                                onItemClick={(item) => openPlaylist(item)}
-                                viewMode={(libraryViewMode === 'LIST' && view === ViewState.LIBRARY && libraryTab !== 'ALL') ? 'LIST' : 'GRID'}
-                                grayscaleMode={grayscaleMode}
-                                squareAvatars={squareAvatars}
-                            />
-                        )}
-                        
-                        {(libraryTab === 'ALL' || libraryTab === 'ALBUMS') && (
-                            <MediaGrid 
-                                title="Saved Albums" 
-                                items={savedAlbums} 
-                                type="ALBUM" 
-                                onItemClick={(item) => openAlbum(item.id)}
-                                viewMode={(libraryViewMode === 'LIST' && view === ViewState.LIBRARY && libraryTab !== 'ALL') ? 'LIST' : 'GRID'}
-                                grayscaleMode={grayscaleMode}
-                                squareAvatars={squareAvatars}
-                            />
-                        )}
-                        
-                        {(libraryTab === 'ALL' || libraryTab === 'ARTISTS') && (
-                            <MediaGrid 
-                                title="Followed Artists" 
-                                items={followedArtists} 
-                                type="ARTIST" 
-                                onItemClick={(item) => openArtist(item.id)}
-                                viewMode={(libraryViewMode === 'LIST' && view === ViewState.LIBRARY && libraryTab !== 'ALL') ? 'LIST' : 'GRID'}
-                                grayscaleMode={grayscaleMode}
-                                squareAvatars={squareAvatars}
-                            />
-                        )}
-
-                        {playlists.length === 0 && likedSongs.length === 0 && savedAlbums.length === 0 && followedArtists.length === 0 && (
-                            <div className="text-center py-20 text-[#b3b3b3]">
-                                <Library size={48} className="mx-auto mb-4 opacity-50" />
-                                <h3 className="text-xl font-bold text-white">Your library is empty</h3>
-                                <p className="mt-2">Go explore and save some music!</p>
+                        {(libraryTab === 'ALL' || libraryTab === 'PLAYLISTS' || libraryTab === 'LIKED_SONGS') && (
+                            <div className="mb-8">
+                                {(libraryTab === 'ALL' || libraryTab === 'PLAYLISTS') && <h2 className="text-xl font-bold mb-4">Playlists</h2>}
+                                <LibraryCollection 
+                                    items={[
+                                        ...(libraryTab === 'ALL' || libraryTab === 'LIKED_SONGS' ? [{
+                                            id: 'liked-songs',
+                                            title: 'Liked Songs',
+                                            image: 'https://misc.scdn.co/liked-songs/liked-songs-640.png',
+                                            creator: { name: 'You' },
+                                            count: likedSongs.length,
+                                            type: 'LIKED_SONGS' // Special marker
+                                        }] : []),
+                                        ...(libraryTab === 'ALL' || libraryTab === 'PLAYLISTS' ? playlists : [])
+                                    ]}
+                                    type={libraryTab === 'LIKED_SONGS' ? 'LIKED_SONGS' : 'PLAYLIST'}
+                                    emptyMessage="No playlists found."
+                                />
+                                {libraryTab === 'ALL' && <div className="h-px bg-[#282828] my-8"></div>}
                             </div>
                         )}
+
+                        {libraryTab === 'LIKED_SONGS' && (
+                             <TrackList 
+                                tracks={likedSongs} 
+                                onPlay={(t) => playTrack(t, likedSongs)} 
+                                currentTrackId={currentTrack?.id} 
+                                onArtistClick={handleArtistClick}
+                                onAlbumClick={handleAlbumClick}
+                                onAddToPlaylist={setTrackToAdd}
+                                accentColor={accentColor}
+                                compactMode={compactMode}
+                            />
+                        )}
+
+                        {(libraryTab === 'ALL' || libraryTab === 'ALBUMS') && (
+                            <div className="mb-8">
+                                {libraryTab === 'ALL' && <h2 className="text-xl font-bold mb-4">Albums</h2>}
+                                <LibraryCollection items={savedAlbums} type="ALBUM" emptyMessage="No saved albums." />
+                                {libraryTab === 'ALL' && <div className="h-px bg-[#282828] my-8"></div>}
+                            </div>
+                        )}
+
+                        {(libraryTab === 'ALL' || libraryTab === 'ARTISTS') && (
+                             <div>
+                                {libraryTab === 'ALL' && <h2 className="text-xl font-bold mb-4">Artists</h2>}
+                                <LibraryCollection items={followedArtists} type="ARTIST" emptyMessage="No followed artists." />
+                             </div>
+                        )}
                     </div>
                 )}
 
-                {/* DETAILS VIEWS */}
-                {view === ViewState.ALBUM_DETAILS && selectedEntity && (
-                    <div className="animate-fade-in">
-                        <DetailHeader 
-                            title={selectedEntity.title}
-                            type="Album"
-                            image={selectedEntity.cover}
-                            subtitle={
-                                <><span className="hover:underline cursor-pointer" onClick={() => openArtist(selectedEntity.artist.id)}>{selectedEntity.artist?.name}</span> • {selectedEntity.releaseDate?.split('-')[0]} • {detailTracks.length} songs</>
-                            }
-                            onPlay={() => handlePlayTrack(detailTracks[0], detailTracks)}
-                            grayscaleMode={grayscaleMode}
-                            squareAvatars={squareAvatars}
-                            actions={
-                                <div className="flex gap-4">
-                                    <button onClick={() => storageService.toggleSaveAlbum(selectedEntity) && refreshLibrary()} className="text-[#b3b3b3] hover:text-white p-2 border border-[#b3b3b3] rounded-full hover:border-white">
-                                        <Heart size={24} fill={storageService.isAlbumSaved(selectedEntity.id) ? accentColor : 'none'} className={storageService.isAlbumSaved(selectedEntity.id) ? 'text-green-500 border-none' : ''} />
-                                    </button>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleDownloadZip(selectedEntity.title, detailTracks)} className="text-[#b3b3b3] hover:text-white p-2" title="Download ZIP"><Archive size={24}/></button>
-                                        <button onClick={() => handleExportCsv(selectedEntity.title, detailTracks)} className="text-[#b3b3b3] hover:text-white p-2" title="Export CSV"><CsvFileIcon size={24}/></button>
+                {view === ViewState.SEARCH && (
+                    <div>
+                        {isLoading ? (
+                            <div className="flex justify-center mt-20"><Loader2 className="animate-spin" size={48} /></div>
+                        ) : hasSearched ? (
+                            <>
+                                {/* Search Category Filters */}
+                                <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                                    {(['ALL', 'TRACKS', 'ALBUMS', 'ARTISTS', 'PLAYLISTS'] as CategoryFilter[]).map(cat => (
+                                        <button 
+                                            key={cat}
+                                            onClick={() => setActiveSearchCategory(cat)}
+                                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeSearchCategory === cat ? 'bg-white text-black' : 'bg-[#2a2a2a] text-white hover:bg-[#3e3e3e]'}`}
+                                        >
+                                            {cat === 'ALL' ? 'All' : cat.charAt(0) + cat.slice(1).toLowerCase()}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {resultTracks.length === 0 && resultAlbums.length === 0 && resultArtists.length === 0 && (
+                                    <div className="text-center text-[#b3b3b3] mt-20">No results found for "{searchHistory[0]}"</div>
+                                )}
+                                
+                                {/* Songs Section */}
+                                {(activeSearchCategory === 'ALL' || activeSearchCategory === 'TRACKS') && resultTracks.length > 0 && (
+                                    <div className="mb-8 animate-slide-up">
+                                        <h2 className="text-2xl font-bold mb-4">Songs</h2>
+                                        <TrackList 
+                                            tracks={activeSearchCategory === 'ALL' ? resultTracks.slice(0, 5) : resultTracks.slice(0, visibleSongsCount)} 
+                                            onPlay={(t) => playTrack(t, resultTracks)} 
+                                            currentTrackId={currentTrack?.id} 
+                                            onArtistClick={handleArtistClick}
+                                            onAlbumClick={handleAlbumClick}
+                                            onAddToPlaylist={setTrackToAdd}
+                                            accentColor={accentColor}
+                                            compactMode={compactMode}
+                                        />
+                                        {activeSearchCategory === 'TRACKS' && resultTracks.length > visibleSongsCount && (
+                                            <div className="mt-4">
+                                                <button 
+                                                    onClick={() => setVisibleSongsCount(prev => prev + 10)}
+                                                    className="px-4 py-2 bg-transparent border border-[#535353] rounded-full text-sm font-bold hover:border-white transition-colors"
+                                                >
+                                                    Load More
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                
+                                {(activeSearchCategory === 'ALL' || activeSearchCategory === 'ALBUMS') && (
+                                    <MediaGrid title="Albums" items={resultAlbums} type="album" />
+                                )}
+
+                                {(activeSearchCategory === 'ALL' || activeSearchCategory === 'ARTISTS') && (
+                                    <MediaGrid title="Artists" items={resultArtists} type="artist" />
+                                )}
+
+                                {(activeSearchCategory === 'ALL' || activeSearchCategory === 'PLAYLISTS') && (
+                                    <MediaGrid title="Playlists" items={resultPlaylists} type="playlist" />
+                                )}
+                            </>
+                        ) : (
+                             // Recent Searches
+                             searchHistory.length > 0 && (
+                                <div className="animate-fade-in">
+                                    <h2 className="text-xl font-bold mb-4">Recent Searches</h2>
+                                    <div className="flex flex-wrap gap-2">
+                                        {searchHistory.map((q, i) => (
+                                            <button key={i} onClick={() => handleSearch(undefined, q)} className="px-4 py-2 bg-[#2a2a2a] hover:bg-[#3e3e3e] rounded-full text-sm transition-colors">
+                                                {q}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
-                            }
-                        />
-                        <TrackList 
-                            tracks={detailTracks} 
-                            onPlay={(t) => handlePlayTrack(t, detailTracks)}
-                            currentTrackId={currentTrack?.id}
-                            onAddToPlaylist={(t) => setTrackToAdd(t)}
-                            accentColor={accentColor}
-                            compactMode={compactMode}
-                        />
+                             )
+                        )}
                     </div>
                 )}
 
-                {view === ViewState.PLAYLIST_DETAILS && selectedEntity && (
-                    <div className="animate-fade-in">
-                         {/* Header with Edit Mode */}
-                        <div 
-                            className={`flex flex-col md:flex-row items-end gap-6 pb-6 border-b border-[#282828] mb-6 animate-fade-in group relative`}
-                            style={{ background: `linear-gradient(to bottom, ${accentColor}10, transparent)` }}
-                        >
-                             <div className="w-48 h-48 md:w-60 md:h-60 shadow-2xl flex-shrink-0 relative">
-                                  <img src={selectedEntity.image} className="w-full h-full object-cover rounded shadow-lg" />
-                                  {selectedEntity.isLocal && (
-                                      <div 
-                                        onClick={() => setShowPlaylistEditModal(true)}
-                                        className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-opacity"
-                                      >
-                                          <Pencil size={32} />
-                                          <span className="text-sm font-bold mt-2">Edit Playlist</span>
-                                      </div>
-                                  )}
-                             </div>
-                             <div className="flex flex-col gap-2 md:gap-4 flex-1 w-full text-center md:text-left">
-                                  <span className="text-xs font-bold uppercase tracking-widest hidden md:block">Playlist</span>
-                                  <h1 className="text-3xl md:text-6xl font-black tracking-tight leading-tight cursor-pointer" onClick={() => selectedEntity.isLocal && setShowPlaylistEditModal(true)}>{selectedEntity.title}</h1>
-                                  <p className="text-[#b3b3b3] text-sm md:text-base line-clamp-2">{selectedEntity.description}</p>
-                                  <div className="flex items-center justify-center md:justify-start gap-2 text-sm font-bold text-white mt-2">
-                                      {selectedEntity.creator.name} • {detailTracks.length} songs
-                                  </div>
-                                  
-                                  <div className="flex items-center justify-center md:justify-start gap-4 mt-4">
-                                      <Button variant="primary" size="lg" onClick={() => detailTracks.length > 0 && handlePlayTrack(detailTracks[0], detailTracks)}>Play</Button>
-                                      <button onClick={() => storageService.savePlaylist(selectedEntity) && refreshLibrary()} className="text-[#b3b3b3] hover:text-white p-2 border border-[#b3b3b3] rounded-full hover:border-white">
-                                           <Heart size={24} fill={storageService.isPlaylistSaved(selectedEntity.uuid) ? accentColor : 'none'} className={storageService.isPlaylistSaved(selectedEntity.uuid) ? 'text-green-500' : ''} />
-                                      </button>
-                                      
-                                      {/* Sort Dropdown */}
-                                      <div className="relative ml-auto md:ml-0 flex gap-2">
-                                          <button onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)} className="text-[#b3b3b3] hover:text-white p-2 flex items-center gap-1 text-sm font-bold">
-                                              {sortOption === 'CUSTOM' ? 'Custom Order' : sortOption} <ArrowDownUp size={16} />
-                                          </button>
-                                          {isSortDropdownOpen && (
-                                              <div className="absolute top-full right-0 mt-2 w-40 bg-[#282828] rounded shadow-xl z-20 border border-[#3e3e3e]">
-                                                  {['CUSTOM', 'TITLE', 'ARTIST', 'ALBUM', 'DURATION'].map(opt => (
-                                                      <button 
-                                                        key={opt}
-                                                        onClick={() => { setSortOption(opt as SortOption); setIsSortDropdownOpen(false); }}
-                                                        className={`w-full text-left px-4 py-2 text-sm hover:bg-white/10 ${sortOption === opt ? 'text-green-500' : 'text-white'}`}
-                                                      >
-                                                          {opt}
-                                                      </button>
-                                                  ))}
-                                              </div>
-                                          )}
-                                          <button onClick={() => handleDownloadZip(selectedEntity.title, detailTracks)} className="text-[#b3b3b3] hover:text-white p-2" title="Download ZIP"><Archive size={24}/></button>
-                                          <button onClick={() => handleExportCsv(selectedEntity.title, detailTracks)} className="text-[#b3b3b3] hover:text-white p-2" title="Export CSV"><CsvFileIcon size={24}/></button>
-                                      </div>
-                                  </div>
-                             </div>
-                        </div>
-
+                {(view === ViewState.ALBUM_DETAILS || view === ViewState.PLAYLIST_DETAILS || view === ViewState.LIKED_SONGS) && selectedEntity && (
+                    <div className="animate-slide-up">
+                        {renderDetailsHeader(
+                            view === ViewState.LIKED_SONGS ? 'LIKED_SONGS' : (view === ViewState.ALBUM_DETAILS ? 'ALBUM' : 'PLAYLIST'),
+                            selectedEntity.title,
+                            selectedEntity.artist?.name || selectedEntity.creator?.name || '',
+                            selectedEntity.cover || selectedEntity.image,
+                            isEntitySaved()
+                        )}
                         <TrackList 
                             tracks={getSortedTracks(detailTracks)} 
-                            onPlay={(t) => handlePlayTrack(t, getSortedTracks(detailTracks))}
-                            currentTrackId={currentTrack?.id}
-                            onArtistClick={openArtist}
-                            onAlbumClick={openAlbum}
-                            onAddToPlaylist={(t) => setTrackToAdd(t)}
+                            onPlay={(t) => playTrack(t, detailTracks)} 
+                            currentTrackId={currentTrack?.id} 
+                            onArtistClick={handleArtistClick}
+                            onAlbumClick={handleAlbumClick}
+                            onAddToPlaylist={setTrackToAdd}
                             accentColor={accentColor}
                             compactMode={compactMode}
                         />
@@ -1093,120 +1070,64 @@ const App: React.FC = () => {
                 )}
 
                 {view === ViewState.ARTIST_DETAILS && selectedEntity && (
-                    <div className="animate-fade-in">
-                        <div className="relative h-[40vh] min-h-[300px] -mx-4 md:-mx-8 -mt-8 mb-8">
-                             <img src={selectedEntity.picture || selectedEntity.image} className={`w-full h-full object-cover ${grayscaleMode ? 'grayscale' : ''}`} style={{ objectPosition: '50% 20%' }} />
-                             <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/30 to-transparent"></div>
-                             <div className="absolute bottom-6 left-6 md:left-10">
-                                 <h1 className="text-4xl md:text-7xl font-black mb-4">{selectedEntity.name}</h1>
-                                 <div className="flex gap-4">
-                                      <Button variant="primary" onClick={() => detailTracks.length > 0 && handlePlayTrack(detailTracks[0], detailTracks)}>Play</Button>
-                                      <Button 
-                                        variant="secondary" 
-                                        onClick={() => storageService.toggleFollowArtist(selectedEntity) && refreshLibrary()}
-                                        className={storageService.isArtistFollowed(selectedEntity.id) ? 'bg-transparent border border-white text-white hover:bg-white/10' : ''}
-                                      >
-                                          {storageService.isArtistFollowed(selectedEntity.id) ? 'Following' : 'Follow'}
-                                      </Button>
-                                 </div>
-                             </div>
-                        </div>
-
-                        <h2 className="text-xl font-bold mb-4">Popular</h2>
-                        <TrackList 
-                            tracks={detailTracks.slice(0, 5)} 
-                            onPlay={(t) => handlePlayTrack(t, detailTracks)}
-                            currentTrackId={currentTrack?.id}
-                            onArtistClick={openArtist}
-                            onAlbumClick={openAlbum}
-                            onAddToPlaylist={(t) => setTrackToAdd(t)}
-                            accentColor={accentColor}
-                            compactMode={compactMode}
-                        />
-
-                        {detailAlbums.length > 0 && (
-                            <div className="mt-10">
-                                <h2 className="text-xl font-bold mb-4">Albums</h2>
-                                <MediaGrid 
-                                    title="" 
-                                    items={detailAlbums} 
-                                    type="ALBUM" 
-                                    onItemClick={(item) => openAlbum(item.id)}
-                                    grayscaleMode={grayscaleMode}
-                                    squareAvatars={squareAvatars}
-                                />
-                            </div>
+                     <div className="animate-slide-up">
+                        {renderDetailsHeader(
+                            'ARTIST',
+                            selectedEntity.name,
+                            '',
+                            selectedEntity.picture,
+                            isEntitySaved()
                         )}
-                    </div>
-                )}
-                
-                {view === ViewState.LIKED_SONGS && (
-                    <div className="animate-fade-in">
-                        <DetailHeader 
-                            title="Liked Songs"
-                            type="Playlist"
-                            image="https://misc.scdn.co/liked-songs/liked-songs-640.png"
-                            subtitle={
-                                <><span>{detailTracks.length} songs</span></>
-                            }
-                            onPlay={() => detailTracks.length > 0 && handlePlayTrack(detailTracks[0], detailTracks)}
-                            grayscaleMode={grayscaleMode}
-                            squareAvatars={squareAvatars}
-                            actions={
-                                <div className="flex gap-2">
-                                     <button onClick={() => handleDownloadZip("Liked Songs", detailTracks)} className="text-[#b3b3b3] hover:text-white p-2" title="Download ZIP"><Archive size={24}/></button>
-                                     <button onClick={() => handleExportCsv("Liked Songs", detailTracks)} className="text-[#b3b3b3] hover:text-white p-2" title="Export CSV"><CsvFileIcon size={24}/></button>
-                                </div>
-                            }
-                        />
-                         <TrackList 
+                        <h2 className="text-2xl font-bold mb-4">Popular</h2>
+                        <TrackList 
                             tracks={detailTracks} 
-                            onPlay={(t) => handlePlayTrack(t, detailTracks)}
-                            currentTrackId={currentTrack?.id}
-                            onArtistClick={openArtist}
-                            onAlbumClick={openAlbum}
-                            onAddToPlaylist={(t) => setTrackToAdd(t)}
+                            onPlay={(t) => playTrack(t, detailTracks)} 
+                            currentTrackId={currentTrack?.id} 
+                            onArtistClick={handleArtistClick}
+                            onAlbumClick={handleAlbumClick}
+                            onAddToPlaylist={setTrackToAdd}
                             accentColor={accentColor}
                             compactMode={compactMode}
                         />
+                        <div className="mt-8">
+                            <MediaGrid title="Albums" items={detailAlbums} type="album" />
+                        </div>
                     </div>
                 )}
-
             </div>
-        </main>
+            </div>
 
-        {/* Right Sidebar */}
-        {rightSidebarMode && (
-             <aside className="w-80 bg-[#121212] border-l border-[#282828] hidden xl:block animate-slide-right">
-                 <RightSidebar 
-                    mode={rightSidebarMode}
-                    queue={queue}
-                    currentTrack={currentTrack}
-                    onPlay={(t) => handlePlayTrack(t)} // Don't reset queue when clicking queue item
-                    onClose={() => setRightSidebarMode(null)}
-                    onClearQueue={() => { setQueue([]); setOriginalQueue([]); }}
-                    onSaveQueue={() => handleCreatePlaylist(`Queue ${new Date().toLocaleDateString()}`, queue)}
-                    accentColor={accentColor}
-                 />
-             </aside>
-        )}
+            {/* Right Sidebar */}
+            {rightSidebarMode && (
+                <div className="w-[300px] hidden lg:block border-l border-[#282828] flex-none animate-slide-right">
+                    <RightSidebar 
+                        mode={rightSidebarMode}
+                        queue={queue}
+                        currentTrack={currentTrack}
+                        onPlay={(t) => playTrack(t, queue)}
+                        onClose={() => setRightSidebarMode(null)}
+                        onClearQueue={() => setQueue(currentTrack ? [currentTrack] : [])}
+                        onSaveQueue={handleSaveQueueAsPlaylist}
+                        accentColor={accentColor}
+                    />
+                </div>
+            )}
+        </div>
       </div>
 
-      {/* Player Bar */}
       <Player 
         currentTrack={currentTrack}
         isPlaying={isPlaying}
-        onPlayPause={handlePlayPause}
+        onPlayPause={() => setIsPlaying(!isPlaying)}
         onNext={handleNext}
         onPrev={handlePrev}
         isShuffling={isShuffling}
         repeatMode={repeatMode}
-        onToggleShuffle={handleShuffleToggle}
-        onToggleRepeat={() => setRepeatMode(m => m === 'OFF' ? 'ALL' : m === 'ALL' ? 'ONE' : 'OFF')}
-        onArtistClick={openArtist}
+        onToggleShuffle={toggleShuffle}
+        onToggleRepeat={toggleRepeat}
+        onArtistClick={handleArtistClick}
         onQualityClick={() => { setSettingsStartTab('QUALITY'); setShowSettingsModal(true); }}
         onDownload={handleDownloadTrack}
-        
         accentColor={accentColor}
         showVisualizer={showVisualizer}
         showStats={showStats}
@@ -1214,102 +1135,65 @@ const App: React.FC = () => {
         setSleepTimer={setSleepTimer}
         highPerformanceMode={highPerformanceMode}
         disableGlow={disableGlow}
-
         showQueue={rightSidebarMode === 'QUEUE'}
-        toggleQueue={() => setRightSidebarMode(m => m === 'QUEUE' ? null : 'QUEUE')}
+        toggleQueue={() => setRightSidebarMode(mode => mode === 'QUEUE' ? null : 'QUEUE')}
         showLyrics={rightSidebarMode === 'LYRICS'}
-        toggleLyrics={() => setRightSidebarMode(m => m === 'LYRICS' ? null : 'LYRICS')}
-
+        toggleLyrics={() => setRightSidebarMode(mode => mode === 'LYRICS' ? null : 'LYRICS')}
         queue={queue}
-        onPlayTrack={(t) => handlePlayTrack(t)}
+        onPlayTrack={(t) => playTrack(t, queue)}
       />
-
-      {/* Modals */}
-      {showImportModal && (
-          <ImportModal 
-            onClose={() => setShowImportModal(false)}
-            onImport={handleCreatePlaylist}
-          />
-      )}
-
-      {showPlaylistEditModal && selectedEntity && (
-          <PlaylistEditModal 
-            playlist={selectedEntity}
-            onClose={() => setShowPlaylistEditModal(false)}
-            onSave={handlePlaylistUpdate}
-            onDelete={handleDeletePlaylist}
-          />
-      )}
-
-      {showSettingsModal && (
-          <SettingsModal 
-            onClose={() => setShowSettingsModal(false)}
-            defaultTab={settingsStartTab}
-            
-            quality={audioQuality}
-            setQuality={(q) => { storageService.setQuality(q); setAudioQuality(q); }}
-            
-            accentColor={accentColor}
-            setAccentColor={(c) => { storageService.setAccentColor(c); setAccentColor(c); }}
-            
-            showStats={showStats}
-            setShowStats={(v) => { storageService.setShowStats(v); setShowStats(v); }}
-            
-            compactMode={compactMode}
-            setCompactMode={(v) => { storageService.setCompactMode(v); setCompactMode(v); }}
-            
-            reducedMotion={reducedMotion}
-            setReducedMotion={(v) => { storageService.setReducedMotion(v); setReducedMotion(v); }}
-            
-            grayscaleMode={grayscaleMode}
-            setGrayscaleMode={(v) => { storageService.setGrayscaleMode(v); setGrayscaleMode(v); }}
-            
-            squareAvatars={squareAvatars}
-            setSquareAvatars={(v) => { storageService.setSquareAvatars(v); setSquareAvatars(v); }}
-
-            sleepTimer={sleepTimer}
-            setSleepTimer={setSleepTimer}
-
-            highPerformanceMode={highPerformanceMode}
-            setHighPerformanceMode={(v) => { storageService.setHighPerformanceMode(v); setHighPerformanceMode(v); }}
-
-            disableGlow={disableGlow}
-            setDisableGlow={(v) => { storageService.setDisableGlow(v); setDisableGlow(v); }}
-
-            updateTitle={updateTitle}
-            setUpdateTitle={(v) => { storageService.setUpdateTitle(v); setUpdateTitle(v); }}
-
-            showVisualizer={showVisualizer}
-            setShowVisualizer={(v) => { storageService.setShowVisualizer(v); setShowVisualizer(v); }}
-          />
-      )}
-
-      {trackToAdd && (
-          <AddToPlaylistModal 
-            track={trackToAdd}
-            onClose={() => setTrackToAdd(null)}
-            onCreateNew={() => { setTrackToAdd(null); setShowImportModal(true); }}
-          />
-      )}
-
-      {/* Mobile Navigation Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#121212] border-t border-[#282828] flex justify-around items-center h-[56px] box-content pb-safe z-50">
-          <button onClick={() => navigateTo({ view: ViewState.HOME })} className={`flex flex-col items-center gap-1 p-2 ${view === ViewState.HOME ? 'text-white' : 'text-[#b3b3b3]'}`}>
-              <Home size={24} strokeWidth={view === ViewState.HOME ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">Home</span>
-          </button>
-          <button onClick={() => navigateTo({ view: ViewState.SEARCH })} className={`flex flex-col items-center gap-1 p-2 ${view === ViewState.SEARCH ? 'text-white' : 'text-[#b3b3b3]'}`}>
-              <Search size={24} strokeWidth={view === ViewState.SEARCH ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">Search</span>
-          </button>
-          <button onClick={() => navigateTo({ view: ViewState.LIBRARY })} className={`flex flex-col items-center gap-1 p-2 ${view === ViewState.LIBRARY ? 'text-white' : 'text-[#b3b3b3]'}`}>
-              <Library size={24} strokeWidth={view === ViewState.LIBRARY ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">Library</span>
-          </button>
-      </div>
 
       <DownloadManager singleDownload={singleDownloadState} zipDownload={zipDownloadState} />
 
+      {showImportModal && <ImportModal onClose={() => setShowImportModal(false)} onImport={(title, tracks) => { const p = storageService.createPlaylist(title); tracks.forEach(t => storageService.addTrackToPlaylist(p.uuid, t)); refreshLibrary(); }} />}
+      
+      {showPlaylistEditModal && selectedEntity && (
+        <PlaylistEditModal 
+            playlist={selectedEntity} 
+            onClose={() => setShowPlaylistEditModal(false)} 
+            onSave={(id, updates, tracks) => { 
+                storageService.updatePlaylist(id, updates);
+                storageService.updatePlaylistTracks(id, tracks);
+                
+                // Update local state deeply to reflect changes immediately
+                selectedEntity.title = updates.title;
+                selectedEntity.description = updates.description;
+                selectedEntity.image = updates.image;
+                selectedEntity.tracks = tracks;
+                // Force update history stack if sorting or tracks changed in this view
+                const newStack = [...historyStack];
+                newStack[historyIndex].detailTracks = tracks;
+                setHistoryStack(newStack);
+
+                refreshLibrary(); 
+            }} 
+            onDelete={(id) => { 
+                storageService.deletePlaylist(id); 
+                refreshLibrary(); 
+                navigateTo({ view: ViewState.LIBRARY }); 
+            }} 
+        />
+      )}
+
+      {showSettingsModal && (
+        <SettingsModal 
+            onClose={() => setShowSettingsModal(false)} 
+            defaultTab={settingsStartTab}
+            quality={audioQuality} setQuality={(q) => { storageService.setQuality(q); setAudioQuality(q); }}
+            accentColor={accentColor} setAccentColor={(c) => { storageService.setAccentColor(c); setAccentColor(c); }}
+            showStats={showStats} setShowStats={(s) => { storageService.setShowStats(s); setShowStats(s); }}
+            compactMode={compactMode} setCompactMode={(s) => { storageService.setCompactMode(s); setCompactMode(s); }}
+            reducedMotion={reducedMotion} setReducedMotion={(s) => { storageService.setReducedMotion(s); setReducedMotion(s); }}
+            grayscaleMode={grayscaleMode} setGrayscaleMode={(s) => { storageService.setGrayscaleMode(s); setGrayscaleMode(s); }}
+            squareAvatars={squareAvatars} setSquareAvatars={(s) => { storageService.setSquareAvatars(s); setSquareAvatars(s); }}
+            sleepTimer={sleepTimer} setSleepTimer={setSleepTimer}
+            highPerformanceMode={highPerformanceMode} setHighPerformanceMode={(s) => { storageService.setHighPerformanceMode(s); setHighPerformanceMode(s); }}
+            disableGlow={disableGlow} setDisableGlow={(s) => { storageService.setDisableGlow(s); setDisableGlow(s); }}
+            updateTitle={updateTitle} setUpdateTitle={(s) => { storageService.setUpdateTitle(s); setUpdateTitle(s); }}
+            showVisualizer={showVisualizer} setShowVisualizer={(s) => { storageService.setShowVisualizer(s); setShowVisualizer(s); }}
+        />
+      )}
+      {trackToAdd && <AddToPlaylistModal track={trackToAdd} onClose={() => setTrackToAdd(null)} onCreateNew={() => setShowImportModal(true)} />}
     </div>
   );
 };
