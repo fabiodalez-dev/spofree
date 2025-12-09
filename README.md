@@ -23,7 +23,7 @@ SpoFree is a free, open-source, and ad-free music player with a massive catalogu
 - **More features coming soon**
 - **Additional Settings** like compact mode, square avatars, grayscale mode
 - **Support for low-end devices** like disable glow, reduced motion, high performance mode
-- **Local File** like .mp3 .m4a and .flac support 
+- **Local File** playing support (.mp3 .m4a and .flac)
 
 ## 🌐 Live Versions
 
