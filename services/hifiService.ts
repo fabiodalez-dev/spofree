@@ -3,6 +3,7 @@
 import { API_INSTANCES } from '../constants';
 import { SearchResult, Track, Album, Artist, Playlist, AudioQuality } from '../types';
 import { storageService } from './storageService';
+import { localFileService } from './localFileService';
 
 let currentInstanceIndex = 0;
 
@@ -148,6 +149,21 @@ const parseAlbum = (item: any): Album => ({
 
 // --- Public API ---
 
+// Lightweight search for just tracks (used for UI elements like Genre Cards)
+export const searchTracks = async (query: string): Promise<Track[]> => {
+    if (!query || !query.trim()) return [];
+    const encoded = encodeURIComponent(query.trim());
+    try {
+        const response = await fetchWithFailover(`/search/?s=${encoded}`, {}, 5000);
+        if (response.ok) {
+            const json = await response.json();
+            const tracksRaw = extractItems(json, 'tracks');
+            return tracksRaw.map(parseTrack).filter(t => t.id && t.title);
+        }
+    } catch (e) { console.error(e); }
+    return [];
+}
+
 export const searchAll = async (query: string): Promise<SearchResult> => {
   if (!query || !query.trim()) return { tracks: [], albums: [], artists: [], playlists: [] };
 
@@ -202,7 +218,19 @@ export const searchAll = async (query: string): Promise<SearchResult> => {
   }
 };
 
-export const getStreamUrl = async (trackId: string | number): Promise<string> => {
+export const getStreamUrl = async (track: Track): Promise<string> => {
+  // Check for Local File
+  if (track.isLocalFile && track.localFileId) {
+      console.log(`[Stream] Loading local file: ${track.title}`);
+      const blob = await localFileService.getFileBlob(track.localFileId);
+      if (blob) {
+          return URL.createObjectURL(blob);
+      }
+      throw new Error("Local file not found or deleted");
+  }
+
+  const trackId = track.id;
+
   // Get preferred quality from storage
   const preferredQuality = storageService.getQuality();
   
