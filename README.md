@@ -71,8 +71,8 @@ Contributions are welcome. Feel free to open a Pull Request. Also please submit 
 
 ## 🔗 Related Projects
 
-- https://github.com/uimaxbai/tidal-ui
-- https://github.com/sachinsenal0x64/hifi  
-- https://github.com/uimaxbai/hifi-api  
-- https://github.com/monochrome-music/monochrome  
-- https://github.com/EduardPrigoana/hifi-instances
+- https://github.com/uimaxbai/tidal-ui - Original Inspiration for this Project
+- https://github.com/sachinsenal0x64/hifi - Tidal Music integration for Subsonic/Jellyfin/Plexamp
+- https://github.com/uimaxbai/hifi-api - API that fetches the streams
+- https://github.com/monochrome-music/monochrome - alternative free tidal music player that uses the same API
+- https://github.com/EduardPrigoana/hifi-instances - list of instances provided for the hifi API
