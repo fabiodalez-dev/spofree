@@ -26,12 +26,13 @@ SpoFree is a free, open-source, and ad-free music player based on Tidal with Hi-
 - 📺**Support for low-end devices** like disable glow, reduced motion, high performance mode
 - ❗️**More features coming soon**
 
-## 🌐 Instances
+## 🌐 Instances / Wrapper
 
 | Version        | URL                         | Note                          |
 |----------------|------------------------------|-------------------------------|
 | **Official**     | https://spo.free.nf  | doesnt have ssl, but it just embeds spofree.vercel.app, hosted on infinityfree        |
 | **Original**       | https://spofree.vercel.app | original domain, embedded by spo.free.nf |
+| **Unofficial**       | https://github.com/eweerfr/spofree-electron | Electron wrapper for windows by [eweer](https://github.com/eweerfr). Thank you for contributing! |
 
 ## ⚙️ How It Works
 
@@ -45,26 +46,6 @@ How it works:
 
 The API instances come from [open-source HiFi projects](https://github.com/EduardPrigoana/hifi-instances) that provide public endpoints.
 
-## Screenshots
-
-### Audio Quality Selector: 
-<img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/audioquality.jpeg" width="50%"> 
-
-### Color Selector: 
-<img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/colors.jpeg" width="50%"> 
-
-### Import Playlist Screen: 
-<img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/import.jpeg" width="50%"> 
-
-### Library: 
-<img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/library.jpeg" width="50%">
-
-### Liked Songs:
-<img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/likedsongs.jpeg" width="50%">
-
-### Extra Settings:
-<img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/tweaks.jpeg" width="50%">
-
 ## 🤝 Contributing and Issues
 
 Contributions are welcome. Feel free to open a Pull Request. Also please submit any bugs you find!
@@ -76,11 +57,36 @@ Contributions are welcome. Feel free to open a Pull Request. Also please submit 
 - https://github.com/uimaxbai/hifi-api - API that fetches the streams
 - https://github.com/monochrome-music/monochrome - alternative free tidal music player that uses the same API
 - https://github.com/EduardPrigoana/hifi-instances - list of instances provided for the hifi API
-
+- https://github.com/eweerfr/spofree-electron - Electron Wrapper of the site for windows
   
-## 🔎 API List
+## Screenshots
 
-API:
+### Audio Quality Selector and Appereance
+<table>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/audioquality.jpeg" width="100%"></td>
+    <td><img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/colors.jpeg" width="100%"></td>
+  </tr>
+</table>
+
+### Playlist Import and Library
+<table>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/import.jpeg" width="100%"></td>
+    <td><img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/library.jpeg" width="100%"></td>
+  </tr>
+</table>
+
+### Liked Songs and Extra Settings
+<table>
+  <tr>
+    <td><img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/likedsongs.jpeg" width="100%"></td>
+    <td><img src="https://raw.githubusercontent.com/redretep/spofree/eaa74dbda39aea0470a7f388436c094ce61b990a/images/tweaks.jpeg" width="100%"></td>
+  </tr>
+</table>
+
+
+## 🔎 API List
 
 | Provider      | Instance URL                                           | Status                                                                   |
 | ------------- | ------------------------------------------------------ | ------------------------------------------------------------------------ |
@@ -96,13 +102,4 @@ API:
 |               | [https://vogel.qqdl.site](https://vogel.qqdl.site)     | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
 |               | [https://katze.qqdl.site](https://katze.qqdl.site)     | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
 |               | [https://hund.qqdl.site](https://hund.qqdl.site)       | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-
-UI:
-
-| Provider        | Instance URL                                                       | Status                                                                   |
-| --------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| tidal-ui (bini) | [https://music.binimum.org/](https://music.binimum.org/)           | ![](https://img.shields.io/website?url=https://music.binimum.org\&label=status) |
-|                 | [https://tidal.squid.wtf](https://tidal.squid.wtf)                 | ![](https://img.shields.io/website?url=https://tidal.squid.wtf\&label=status) |
-| Digger          | [https://digger-ui.vercel.app/](https://digger-ui.vercel.app/)     | ![](https://img.shields.io/website?url=https://digger-ui.vercel.app\&label=status) |
-| SpoFree         | [https://spo.free.nf/](https://spo.free.nf/)                       | ![](https://img.shields.io/website?url=https://spo.free.nf\&label=status) |
 
