@@ -19,11 +19,12 @@ SpoFree is a free, open-source, and ad-free music player based on Tidal with Hi-
 - 🔢**Queue** that you can save as a playlist and customize
 - 🎵**Media Session API** for lock screen and control center support
 - 📶**Library Tabs** Organized library with Playlists, Liked Songs, Saved Albums, and Followed Artists.
-- 📲**Import Playlist** via Text (Artist - Title) or CSV file or from local files
 - 🎵**Audio Quality Selector** ability to switch between Low, High, Lossless, and Hi-Res audio qualities.
 - 🟥**Accent Color** you can select that themes the player, sliders, and active elements.
 - ⚙️**Additional Settings** like compact mode, square avatars, grayscale mode
 - 📺**Support for low-end devices** like disable glow, reduced motion, high performance mode
+- 📲**Import Playlist** via Text (Artist - Title) or CSV file or from local files
+- 📥**Import Spotify Playlists** using [this website](https://redretep.github.io/spofree-playlists/), [this](https://github.com/redretep/spofree-playlists) is the repo
 - ❗️**More features coming soon**
 
 ## 🌐 Instances / Wrapper
