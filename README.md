@@ -7,22 +7,22 @@ SpoFree is a free, open-source, and ad-free music player based on Tidal with Hi-
 
 ## Features
 
-- ❌**Ad-Free Listening** from Tidal
-- 💿**Lossless Audio** for hifi sound
-- 🎧**Huge Catalogue** powered by the full TIDAL library and HiFi APIs
+- ❌**Ad-Free Listening**
+- 💿**Lossless Audio**
+- 🎧**Huge Catalogue** powered by the full TIDAL library
 - 🔲**Clean UI** similar to Spotify
-- 🎶**Playlist Support** create and import your own Playlists
+- 🎶**Playlist Support**
 - 📁**Local Storage** playlists, liked songs, recently listened saved via IndexDB in your browser
-- 🔎**Search** find media and sort by album, track, artist, or playlist
-- 💾**Export** songs, playlists, albums and liked songs as csv or zip containing lossless .flac files
+- 🔎**Search**
+- 💾**Export** audio as csv or zip containing lossless .flac files
 - ⏰**Sleep Timer** with customizable length
 - 🔢**Queue** that you can save as a playlist and customize
 - 🎵**Media Session API** for lock screen and control center support
-- 📶**Library Tabs** Organized library with Playlists, Liked Songs, Saved Albums, and Followed Artists.
-- 🎵**Audio Quality Selector** ability to switch between Low, High, Lossless, and Hi-Res audio qualities.
-- 🟥**Accent Color** you can select that themes the player, sliders, and active elements.
-- ⚙️**Additional Settings** like compact mode, square avatars, grayscale mode
-- 📺**Support for low-end devices** like disable glow, reduced motion, high performance mode
+- 📶**Library** Organized library with Playlists, Liked Songs, Saved Albums, and Followed Artists.
+- 🎵**Audio Quality Selector**
+- 🟥**Accent Color**
+- ⚙️**Additional Settings**
+- 📺**Settings for low-end devices**
 - 📲**Import Playlist** via Text (Artist - Title) or CSV file or from local files
 - 📥**Import Spotify Playlists** using [this website](https://redretep.github.io/spofree-playlists/), [this](https://github.com/redretep/spofree-playlists) is the repo
 - ❗️**More features coming soon**
