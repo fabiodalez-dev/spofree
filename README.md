@@ -87,20 +87,3 @@ Contributions are welcome. Feel free to open a Pull Request. Also please submit 
 </table>
 
 
-## 🔎 API List
-
-| Provider      | Instance URL                                           | Status                                                                   |
-| ------------- | ------------------------------------------------------ | ------------------------------------------------------------------------ |
-| squid.wtf     | [https://triton.squid.wtf](https://triton.squid.wtf)   | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://aether.squid.wtf](https://aether.squid.wtf)   | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://zeus.squid.wtf](https://zeus.squid.wtf)       | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://kraken.squid.wtf](https://kraken.squid.wtf)   | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://phoenix.squid.wtf](https://phoenix.squid.wtf) | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://shiva.squid.wtf](https://shiva.squid.wtf)     | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://chaos.squid.wtf](https://chaos.squid.wtf)     | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-| lucida (qqdl) | [https://wolf.qqdl.site](https://wolf.qqdl.site)       | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://maus.qqdl.site](https://maus.qqdl.site)       | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://vogel.qqdl.site](https://vogel.qqdl.site)     | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://katze.qqdl.site](https://katze.qqdl.site)     | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-|               | [https://hund.qqdl.site](https://hund.qqdl.site)       | ![](https://img.shields.io/website?url=https://google.com\&label=status) |
-
