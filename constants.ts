@@ -3,11 +3,20 @@ import { Track } from './types';
 
 // List of public Hifi API instances provided by the user.
 export const API_INSTANCES = [
+  'https://monochrome-api.samidy.com',
+  'https://api.monochrome.tf',
+  'https://arran.monochrome.tf',
+  'https://triton.squid.wtf',
   'https://wolf.qqdl.site',
   'https://maus.qqdl.site',
   'https://vogel.qqdl.site',
   'https://katze.qqdl.site',
   'https://hund.qqdl.site',
+  'https://tidal.kinoplus.online',
+  'https://tidal-api.binimum.org',
+  'https://triton.squid.wtf',
+  'https://hifi-one.spotisaver.net',
+  'https://hifi-two.spotisaver.net',
 ];
 
 // Select the first instance by default
